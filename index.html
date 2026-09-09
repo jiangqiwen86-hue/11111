@@ -1405,7 +1405,7 @@ async function callDeepSeekVision(prompt, imageBase64){
         {type:'image_url', image_url:{url:imageBase64, detail:detail}}
       ]}
     ];
-    const bodyStr=JSON.stringify({model:'deepseek-v4-flash-vision-exp',messages,temperature:0.7,max_tokens:1500});
+    const bodyStr=JSON.stringify({model:'deepseek-v4-flash-vision-exp',messages,temperature:0.7,max_tokens:3000});
     if(bodyStr.length > 8*1024*1024) return {err:'请求体超过 8MB（图片或提示词过大）。请换张更小的图片，或先压缩到 1MB 以内再上传。'};
     try{
       const res=await fetch('https://api.deepseek.com/chat/completions',{method:'POST',
@@ -1426,7 +1426,15 @@ async function callDeepSeekVision(prompt, imageBase64){
   let r2=await doCall('high');
   if(r2.text) return r2;
   if(r2.err) return r2;
-  return {err:`视觉模型两次均返回空内容（finish_reason=${r2.reason||'unknown'}）。可能原因：①图片内容无法被识别（换张更清晰的 JPG 重试）②实验版模型波动（稍后重试）③图片含特殊内容。body 约 ${r2.size}KB。`};
+  let errMsg = '视觉模型两次均返回空内容 (finish_reason=' + (r2.reason||'unknown') + ')。\n';
+  if(r2.reason==='length'){
+    errMsg += '⚠️ 原因：模型输出达到 max_tokens 上限被截断（已提到 3000 tokens）。\n';
+    errMsg += '建议：① 这张图内容确实很丰富，分析需要超过 3000 tokens（可再上调） ② 把图片压缩得更小、聚焦关键区域后重试。\n';
+  } else {
+    errMsg += '可能原因：① 图片内容无法被识别（换张更清晰的 JPG 重试） ② 实验版模型波动（稍后重试） ③ 图片含特殊内容。\n';
+  }
+  errMsg += 'body 约 ' + r2.size + 'KB。';
+  return {err:errMsg};
 }
 
 // 图片压缩为 base64 data URL（控制体积，适配视觉模型内联输入；多层兜底，绝不返回空/损坏 base64）
