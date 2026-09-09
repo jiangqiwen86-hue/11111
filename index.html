@@ -1538,10 +1538,14 @@ function viewAI(){
     <div class="ai-out" id="scriptOut" style="margin-top:10px"><span style="color:var(--dim)">优化建议将显示在这里…</span></div>
   </div>
 
+  ${session.role==='admin' ? `
   <div class="card"><h3><span class="dot"></span>内置直播知识库</h3>
-    <div class="desc">直播漏斗模型 · 爆款公式 · 钩子库 · 话术库 · 避坑清单</div>
+    <div class="desc">直播漏斗模型 · 爆款公式 · 钩子库 · 话术库 · 避坑清单 · 真实案例（仅总负责人可见）</div>
     <div class="kb-grid">${KB_HTML()}</div>
-  </div>
+  </div>` : `
+  <div class="card"><h3><span class="dot"></span>内置直播知识库</h3>
+    <div class="hint" style="line-height:1.9">✅ 直播运营知识库已在后台内置（抖音官方方法论 + 14 类目打法 + 真实大卖案例）。<br>无需查看具体内容，直接在上方提问、上传场景图或粘贴话术，AI 会自动结合知识库给出针对性方案。</div>
+  </div>`}
   <div class="footer-note">AI 生成内容仅供参考，最终决策权在运营人员 · LiveOps Console</div>`;
 }
 function KB_HTML(){
