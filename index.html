@@ -1645,6 +1645,93 @@ function getTargetStore(prefix){
   return (sel && sel.value) ? sel.value : null;
 }
 
+// ===== 直播间优化布局草图（SVG）=====
+function renderSketchSVG(sketch){
+  const zones=(sketch&&sketch.zones)||[];
+  const title=(sketch&&sketch.title)||'优化后直播间布局草图';
+  const anchors=[
+    {x:340,y:180,t:'主播区'},
+    {x:340,y:385,t:'前景产品桌'},
+    {x:82,y:180,t:'左侧陈列区'},
+    {x:598,y:180,t:'右侧陈列区'},
+    {x:340,y:48,t:'背景墙·logo/贴片'},
+    {x:125,y:70,t:'补光灯45°'},
+    {x:555,y:70,t:'补光灯45°'},
+  ];
+  const items=zones.map((z,i)=>({text:z, ...anchors[i%anchors.length]}));
+  const colors=['#e1306c','#833ab4','#405de6','#16a34a','#d97706','#0891b2','#0d9488'];
+  let svg=`<svg viewBox="0 0 680 460" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;border-radius:12px;border:1px solid var(--border);background:linear-gradient(160deg,#fafafa,#f0f4ff)">
+    <rect x="60" y="16" width="560" height="120" rx="10" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+    <text x="340" y="40" text-anchor="middle" font-size="11" fill="#9ca3af">背景墙（品牌 logo + 活动贴片）</text>
+    <rect x="60" y="150" width="88" height="150" rx="8" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+    <text x="104" y="190" text-anchor="middle" font-size="10" fill="#64748b">左侧</text><text x="104" y="205" text-anchor="middle" font-size="10" fill="#64748b">陈列架</text>
+    <rect x="532" y="150" width="88" height="150" rx="8" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+    <text x="576" y="190" text-anchor="middle" font-size="10" fill="#64748b">右侧</text><text x="576" y="205" text-anchor="middle" font-size="10" fill="#64748b">陈列架</text>
+    <rect x="120" y="330" width="440" height="96" rx="10" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+    <text x="340" y="382" text-anchor="middle" font-size="12" fill="#9a3412">前景产品展示桌（引流款 + 价格牌）</text>
+    <circle cx="340" cy="245" r="42" fill="#fde2e4" stroke="#e1306c" stroke-width="2"/>
+    <text x="340" y="249" text-anchor="middle" font-size="13" fill="#9d174d">主播</text>
+    <circle cx="125" cy="78" r="13" fill="#fef9c3" stroke="#eab308" stroke-width="2"/>
+    <circle cx="555" cy="78" r="13" fill="#fef9c3" stroke="#eab308" stroke-width="2"/>
+    <text x="125" y="52" text-anchor="middle" font-size="9" fill="#a16207">补光灯</text>
+    <text x="555" y="52" text-anchor="middle" font-size="9" fill="#a16207">补光灯</text>`;
+  items.forEach((it,i)=>{
+    const c=colors[i%colors.length];
+    svg+=`<circle cx="${it.x}" cy="${it.y}" r="13" fill="${c}"/><text x="${it.x}" y="${it.y+4}" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">${i+1}</text>`;
+  });
+  svg+=`</svg>`;
+  const legend=items.map((it,i)=>`<div style="display:flex;gap:8px;align-items:flex-start;margin:6px 0"><span style="flex:none;width:20px;height:20px;border-radius:50%;background:${colors[i%colors.length]};color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:20px">${i+1}</span><span style="font-size:13px;line-height:1.5">${it.text}</span></div>`).join('');
+  return `<div class="card" style="margin-top:12px"><h4>🎨 ${title}</h4><div style="margin:10px 0">${svg}</div>${legend}</div>`;
+}
+
+// ===== 场景诊断报告渲染（原图标注 + 草图 + 文字）=====
+function renderSceneReport(base64, text, sizeInfo){
+  let marks=[], sketch=null;
+  const jsonMatch=text.match(/```json\s*([\s\S]*?)```/);
+  let cleanText=text;
+  if(jsonMatch){
+    try{
+      const obj=JSON.parse(jsonMatch[1].trim());
+      if(obj && obj.marks && obj.marks.length) marks=obj.marks;
+      if(obj && obj.sketch) sketch=obj.sketch;
+      cleanText=text.replace(jsonMatch[0],'').trim();
+    }catch(e){}
+  }
+  // 原图 + 标注框
+  let imgHtml='';
+  if(base64){
+    imgHtml=`<div style="position:relative;margin:12px 0;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--panel2)">
+      <img src="${base64}" style="width:100%;display:block">
+      ${marks.map(m=>{
+        const c=['#e1306c','#833ab4','#405de6','#16a34a','#d97706','#0891b2'][((m.n||1)-1)%6];
+        const x=m.x!=null?m.x:0, y=m.y!=null?m.y:0, w=(m.w!=null?m.w:18), h=(m.h!=null?m.h:14);
+        return `<div style="position:absolute;left:${Math.max(0,Math.min(100,x))}%;top:${Math.max(0,Math.min(100,y))}%;width:${Math.max(5,Math.min(100,w))}%;height:${Math.max(4,Math.min(100,h))}%;border:2px solid ${c};background:${c}33;border-radius:6px;box-sizing:border-box" title="${(m.issue||'')}">
+          <span style="position:absolute;left:-2px;top:-14px;background:${c};color:#fff;font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;white-space:nowrap">${m.n||''} ${m.label||''}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+  // 标注明细
+  let legendHtml='';
+  if(marks.length){
+    legendHtml=`<div class="card" style="margin-top:10px"><h4>📍 图上标注明细</h4><ul style="margin:8px 0 0 18px;line-height:1.8">${marks.map(m=>`<li><b style="color:#e1306c">${m.n||''}. ${m.label||'区域'}</b>：<span style="color:var(--orange)">${m.issue||''}</span> → ${m.fix||''}</li>`).join('')}</ul></div>`;
+  }
+  // 优化草图
+  let sketchHtml='';
+  if(sketch && sketch.zones && sketch.zones.length){
+    sketchHtml=renderSketchSVG(sketch);
+  }
+  // 文字诊断
+  const textHtml = cleanText ? `<div class="card" style="margin-top:10px"><h4>📋 详细文字诊断</h4><div style="white-space:pre-wrap;line-height:1.8;font-size:14px">${cleanText}</div></div>` : '';
+  return `<div style="margin-top:10px">
+    ${imgHtml}
+    ${legendHtml}
+    ${sketchHtml}
+    ${textHtml}
+    <div style="margin-top:8px">${sizeInfo}</div>
+  </div>`;
+}
+
 // ===== 直播间场景图片识别诊断 =====
 async function aiAnalyzeScene(){
   const out=document.getElementById('sceneOut');
@@ -1667,10 +1754,11 @@ async function aiAnalyzeScene(){
       prompt+='\n【大盘达标线(中位数)】'+JSON.stringify(benchSummary());
       const ctx=catCtx(s.cat); if(ctx) prompt+=ctx;
     }
+    prompt+='\n\n请务必在文字诊断之后，再输出一段【图上标注 + 优化草图】数据，严格用三个反引号 json 包裹（放在最后），格式如下：\n```json\n{\n  "marks": [\n    {"n":1, "label":"灯光", "x":15, "y":10, "w":40, "h":20, "issue":"顶光偏暗且不均匀", "fix":"顶部加2盏环形补光灯，色温5500K"},\n    {"n":2, "label":"产品陈列", "x":55, "y":30, "w":35, "h":40, "issue":"产品摆放零散", "fix":"主推品前置居中，按价格梯队排列"}\n  ],\n  "sketch": {\n    "title":"优化后直播间布局草图",\n    "zones":["主播居中偏左","主推产品右侧前景陈列","背景墙放品牌logo+活动贴片","左右45度各一盏补光灯","前景桌面放引流款+价格牌"]\n  }\n}\n```\n其中 marks 的 x/y/w/h 都是相对图片宽高的百分比(0-100)，标注画面中每个需要调整的区域（至少 3-6 个）；sketch.zones 是优化后布局的要点（5-7 条），用于绘制布局草图。';
     const r=await callDeepSeekVision(prompt, base64);
     const sizeInfo=`<span style="color:var(--dim)">（原图 ${Math.round(file.size/1024)}KB → 处理后约 ${Math.round(base64.length*3/4/1024)}KB）</span>`;
     if(r.err){ out.innerHTML=`<div class="callout amber"><b>识别失败</b>${r.err}<br>${sizeInfo}</div>`; }
-    else{ out.innerHTML=r.text; window._export={title:'直播间场景诊断_'+new Date().toISOString().slice(0,10), md:'# 直播间场景诊断\n\n'+r.text}; }
+    else{ out.innerHTML=renderSceneReport(base64, r.text, sizeInfo); window._export={title:'直播间场景诊断_'+new Date().toISOString().slice(0,10), md:'# 直播间场景诊断\n\n'+r.text}; }
   }catch(e){ out.innerHTML='<div class="callout amber"><b>图片处理失败</b>'+String(e)+'</div>'; }
 }
 
