@@ -1552,7 +1552,9 @@ function viewAI(){
     <div class="desc">上传直播间场景截图，AI 识别画面并从灯光/背景/陈列/布局等维度给出优化建议（综合本店数据与品类打法）</div>
     ${storeSelector('scene')}
     <input type="file" id="sceneFile" accept="image/*" class="inp" style="margin-bottom:10px">
-    <div class="btn-row"><button class="btn" onclick="aiAnalyzeScene()">🔍 识别并诊断场景</button></div>
+    <div class="btn-row"><button class="btn" onclick="aiAnalyzeScene()">🔍 识别并诊断场景</button>
+      <button class="btn ghost" onclick="exportConclusion()">📥 导出结论</button>
+      <button class="btn ghost" onclick="exportConclusionHtml()">导出报告(HTML)</button></div>
     <div class="ai-out" id="sceneOut" style="margin-top:10px"><span style="color:var(--dim)">诊断建议将显示在这里…</span></div>
   </div>
 
