@@ -1228,7 +1228,46 @@ function viewStandard(){
 }
 
 // ================= DeepSeek 集成 =================
-const DS_SYSTEM='你是资深跨境电商直播运营分析专家，精通 TikTok/Shopee/Lazada 直播带货。你擅长用数据定位直播间卡点，输出可落地、带预期指标的优化方案。回答专业、犀利、结构化，用中文，直接给结论和动作，不空谈方向。';
+const DS_SYSTEM='你是资深跨境电商直播运营分析专家，精通 TikTok/Shopee/Lazada 直播带货。核心铁律：**必须严格结合直播间的品类属性给出方案**。不同品类的目标人群、决策逻辑、主打卖点、直播节奏、话术、信任背书都截然不同，先判断品类，再套用该品类的直播打法。方案必须落到「具体动作 + 可直接照搬的话术 + 预期指标（如 PCR 提升 X 个百分点、观看时长提升到 X 秒）」，禁止给出"优化开头""提升转化""加强互动"这类放之四海皆准、无法执行的空话。回答专业、犀利、结构化，用中文。';
+
+// ===== 品类属性知识库（直播打法按品类分化，AI 据此给针对性方案）=====
+const CATEGORY_KB=[
+ {g:'母婴类',keys:['母婴生活','母婴出行'],p:{人群:'新手爸妈、孕妈、送礼亲友',决策:'安全性＞材质＞颜值＞价格，先过信任关才谈价格',卖点:'安全认证(3C/ECE/EN)、无毒材质、可调节、便携折叠、透气',节奏:'安全痛点切入→真人实测→权威认证展示→价格锚点→限时逼单',话术:'"这款通过了XX认证""我家宝宝从出生就在用""坐垫透气夏天不闷汗""一键折叠放后备箱"',信任:'真人实测、质检/认证报告上墙、买家秀、质保与退换承诺',卡点:'高客单决策慢→分期/限时价+安全背书破冰；转化低→把认证报告前置到第3秒',避坑:'别只讲外观不讲安全；别用惊吓式焦虑营销'}},
+ {g:'家具家居类',keys:['家具用品','卧室家具','竹制家具','客厅家具','办公家具','柜类家具','坐靠用品','床垫用品'],p:{人群:'装修/换新家庭、租房党',决策:'尺寸适配＞材质环保＞承重＞性价比',卖点:'实拍尺寸、环保材质、承重、易安装/包安装、场景搭配',节奏:'空间场景搭建→痛点(旧家具难用/不环保)→上手体验→尺寸说明→组合套餐连带',话术:'"量好尺寸再拍""这个床垫软硬适中不腰酸""竹子透气又环保""今天下单包安装"',信任:'实物场景直播、安装演示、材质对比、7天无理由',卡点:'大件决策重→场景化展示+7天无理由；客单高→组合套餐拉连带',避坑:'尺寸规格含糊导致退货；只拍单品不拍整屋场景'}},
+ {g:'收纳整理类',keys:['储物收纳','鞋服收纳'],p:{人群:'租房党、小户型、家庭主妇',决策:'省空间＞耐用＞颜值＞价格',卖点:'折叠/叠加/悬挂、承重、透明可视、尺寸适配',节奏:'凌乱痛点→一放就整齐的视觉对比→多规格演示→组合购',话术:'"一格一格看得清""叠起来省一半空间""承重X公斤不掉""三件套更划算"',信任:'实拍收纳前后对比、承重实测',卡点:'客单低→用组合套装/多规格拉高连带',避坑:'只讲能装多少不讲尺寸，买回去不合用'}},
+ {g:'户外运动类',keys:['户外用品','户外休闲','户外照明','骑行用品','有氧训练','减脂塑形','外出游乐'],p:{人群:'运动爱好者、露营党、亲子家庭',决策:'体验感＞耐用＞便携＞价格',卖点:'实拍使用场景、耐用防水、便携、效果可见(健身)',节奏:'户外实景/氛围感开场→痛点(装备不好用)→真人体验→效果对比→限时',话术:'"夜跑有它看得清""这个折叠起来巴掌大""练两周腰围小一圈""带娃出去遛一圈不累"',信任:'户外实拍、真人使用、效果前后对比',卡点:'看热闹不下单→用限时价/赠品制造紧迫；客单高→拆配件连带',避坑:'室内拍户外品，无场景氛围；健身类夸大效果(合规风险)'}},
+ {g:'宠物类',keys:['宠物家居','宠物日用'],p:{人群:'养宠人群、猫狗家长',决策:'宠物喜欢＞安全＞耐用＞价格',卖点:'宠物安全材质、易清洗、宠物真实使用、颜值',节奏:'萌宠出镜吸睛→痛点(掉毛/难清理/宠物不爱用)→宠物实测→限时',话术:'"我家猫自己钻进去睡""这个一擦就干净""不伤爪不伤毛""今天下单送罐头"',信任:'宠物真实出镜使用、清洗演示',卡点:'看猫狗不下单→用限时价/赠品逼单；信任→主打安全无毒材质',避坑:'只拍人讲不拍宠物实际用'}},
+ {g:'工具五金类',keys:['铁艺用品','焊接工具','五金机电','农业工具','清洁工具'],p:{人群:'男性用户、DIY爱好者、工坊/农场主',决策:'耐用/功率＞安全＞性价比',卖点:'材质扎实、功率/承重、实操效果、保修',节奏:'实操演示→痛点(工具不好用/易坏)→效果对比→参数→保修',话术:'"这一下就焊住了""承重X公斤没问题""用三年不会坏""质保X年"',信任:'实操演示、承重/功率实测、质保',卡点:'男性理性决策→用参数+实操+质保说服；转化→限时价+赠配件',避坑:'只讲参数不实操，缺乏说服力'}},
+ {g:'家电类',keys:['生活家电','厨卫家电'],p:{人群:'家庭主妇、品质生活人群',决策:'功能效果＞省心＞能耗＞价格',卖点:'功能演示、省时省力、静音/能耗、售后',节奏:'痛点(家务累/费时)→功能实测→效果对比→售后保障→限时',话术:'"这个一键搞定不用手洗""比手洗还干净""静音不吵娃""坏了X年内免费换"',信任:'功能实测、使用前后对比、售后承诺',卡点:'高客单→分期/限时+以旧换新；信任→质保和退换说清',避坑:'只讲功能多不讲核心效果'}},
+ {g:'3C数码类',keys:['3C数码'],p:{人群:'数码爱好者、性价比党',决策:'参数/性价比＞口碑＞售后',卖点:'核心参数、跑分/实测、兼容性、价格优势',节奏:'参数对比开场→实测/跑分→同价位对比→限时价',话术:'"同价位它多给X""这个配置别家卖X""实测跑分X""今天下单送壳膜"',信任:'实测数据、同价位横评、官方质保',卡点:'理性比价→用同价位对比+限时价破冰',避坑:'参数造假/夸大(合规风险)；只报参数不做对比'}},
+ {g:'出行载运类',keys:['载运工具','汽配用品','电驱用品'],p:{人群:'车主、物流/搬运人群、通勤族',决策:'载重/续航＞安全＞耐用＞价格',卖点:'载重/续航实测、适配车型、安全、耐用',节奏:'载重/续航实测开场→痛点(不够力/不耐用)→实测→适配说明→限时',话术:'"拉X斤不费劲""满电跑X公里""这个车型直接装""质保X年"',信任:'载重/续航实测、适配车型说明、质保',卡点:'适配疑虑→把车型/参数列清楚；客单高→限时+赠品',避坑:'适配信息含糊导致退换'}},
+ {g:'厨房用品类',keys:['厨房用品'],p:{人群:'下厨人群、家庭主妇/煮夫',决策:'实用/不粘＞好清洗＞耐用＞价格',卖点:'不粘/省油实测、易清洗、健康材质、颜值',节奏:'烹饪实测开场→痛点(粘锅/难洗)→实操→效果→限时',话术:'"煎蛋不粘不糊""这个锅一冲就干净""无涂层更健康""今天下单送锅铲"',信任:'现场烹饪实测、清洗演示、材质说明',卡点:'看热闹不下单→现场做菜效果+限时价',避坑:'只讲不粘不实测；夸大健康功效'}},
+ {g:'家纺软装类',keys:['家装软饰','地毯用品','蚊帐用品'],p:{人群:'注重家居氛围的家庭',决策:'颜值氛围＞材质舒适＞耐用＞价格',卖点:'实拍质感、触感材质、风格搭配、易打理',节奏:'氛围场景开场→痛点(不遮光/易脏)→材质手感→搭配建议→限时',话术:'"铺上整个客厅高级了""这个一抖就平整""亲肤不扎""遮光又透气"',信任:'实拍质感、材质手感展示',卡点:'色差质感疑虑→多角度实拍+材质说明',避坑:'只拍精修图不拍实拍质感'}},
+ {g:'箱包皮具类',keys:['皮具箱包'],p:{人群:'通勤、差旅人群',决策:'质感＞耐用＞容量＞价格',卖点:'皮质/做工细节、容量、耐磨、肩带舒适',节奏:'质感细节开场→痛点(不耐磨/容量小)→做工细节→容量演示→限时',话术:'"真皮越用越亮""这个能装下14寸电脑""肩带不勒""今天下单送护理油"',信任:'细节特写、容量实测、皮质说明',卡点:'真假皮疑虑→细节特写+材质说明',避坑:'皮具描述含糊，不说明合成/真皮'}},
+ {g:'办公安防类',keys:['办公安防'],p:{人群:'企业采购、门店/仓储主',决策:'稳定安全＞兼容＞性价比',卖点:'清晰度/稳定性、安装简单、售后、兼容',节奏:'效果演示开场→痛点(模糊/不稳定)→实测→安装说明→售后',话术:'"这个画质清晰夜视也好""手机就能看回放""自己就能装""质保X年"',信任:'画质实测、安装演示、售后',卡点:'B端理性决策→效果实测+售后质保',避坑:'只讲参数不讲安装和售后'}},
+ {g:'照明类',keys:['市电照明'],p:{人群:'家装/商用照明需求',决策:'亮度色温＞节能＞耐用＞价格',卖点:'亮度/色温实测、护眼、节能、寿命',节奏:'亮度对比开场→痛点(昏暗/费电)→实测→参数→限时',话术:'"这个亮度直接翻倍""色温柔和护眼""一年省X度电""质保X年"',信任:'亮度/色温实测、能耗说明',卡点:'亮度疑虑→实拍对比；客单低→组合套装',避坑:'亮度虚标'}},
+];
+function catProfile(cat){
+  if(!cat) return null;
+  const hit=CATEGORY_KB.find(c=>c.keys.some(k=>k===cat || cat.indexOf(k)>=0 || k.indexOf(cat)>=0));
+  return hit||null;
+}
+const ALL_CATS=[...new Set(Object.values(DATA.store_series).map(s=>s.cat).filter(Boolean))].sort();
+function myCat(){ return (DATA.store_series[myStore()]||{}).cat || null; }
+function detectCat(text){
+  if(!text) return null;
+  const sorted=[...ALL_CATS].sort((a,b)=>b.length-a.length);
+  for(const k of sorted){ if(text.indexOf(k)>=0) return k; }
+  return null;
+}
+function catCtx(cat){
+  if(!cat) return null;
+  const prof=catProfile(cat);
+  if(prof){
+    return `\n\n【当前直播间品类属性（务必严格围绕该品类给出针对性方案，禁止通用空话）】\n品类：${cat}\n目标人群：${prof.p.人群}\n用户决策逻辑：${prof.p.决策}\n直播应主打卖点：${prof.p.卖点}\n推荐直播节奏：${prof.p.节奏}\n可直接照搬的话术：${prof.p.话术}\n信任背书方式：${prof.p.信任}\n该品类常见卡点与解法：${prof.p.卡点}\n避坑提醒：${prof.p.避坑}`;
+  }
+  return `\n\n【当前直播间品类】${cat}（未命中品类知识库，请基于该品类常识，结合人群/决策逻辑给出针对性方案）`;
+}
 
 // ===== Key 安全存储：优先走服务端代理（Key 不落前端），直连 Key 仅作可选兜底 =====
 // 内置默认 DeepSeek Key（所有账号默认可用；总负责人可在配置页覆盖）
@@ -1309,8 +1348,12 @@ function viewAI(){
   </div>` : ''}
 
   <div class="card"><h3><span class="dot"></span>AI 问答（直播诊断 / 脚本 / 话术）</h3>
-    <div class="desc">输入问题，AI 结合大盘数据与直播知识库回答</div>
-    <textarea id="aiPrompt" placeholder="例如：某母婴店 PCR 只有 2%，观看时长 30 秒，该如何提升转化？请给出具体动作和话术。"></textarea>
+    <div class="desc">输入问题，AI 结合大盘数据、品类属性与直播知识库回答（按品类给出针对性方案）</div>
+    <div class="hint" style="margin-bottom:6px">🏷️ 直播间品类（AI 将严格按此品类给出方案）</div>
+    ${isAdminUser
+      ? `<select class="sel" id="aiCatSel" style="max-width:360px;margin-bottom:10px"><option value="auto">自动识别（从问题中推断品类）</option>${ALL_CATS.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>`
+      : `<div class="hint" style="margin-bottom:10px">已锁定本店品类：<b style="color:var(--cyan)">${myCat()||'未标注'}</b>（店长账号自动按本店品类回答）</div>`}
+    <textarea id="aiPrompt" placeholder="例如：PCR 只有 2%，观看时长 30 秒，该如何提升转化？请给出具体动作和话术。"></textarea>
     <div class="btn-row"><button class="btn" onclick="aiAsk()">🤖 提问</button>
       <button class="btn ghost" onclick="document.getElementById('aiPrompt').value='diagnose:${isAdminUser?'对当前大盘数据做整体诊断，指出最需关注的国家/品类和Top3机会点':'对我的店铺做整体诊断，指出核心卡点和Top3优化机会'}'">${isAdminUser?'用大盘诊断示例':'用本店诊断示例'}</button></div>
     <div class="ai-out" id="aiOut"><span style="color:var(--dim)">回答将显示在这里…</span></div>
@@ -1343,6 +1386,17 @@ async function aiAsk(){
   const out=document.getElementById('aiOut'); const q=document.getElementById('aiPrompt').value.trim();
   if(!q){ out.innerHTML='<span style="color:var(--dim)">请先输入问题</span>'; return; }
   out.innerHTML='<span class="typing">▍ DeepSeek 思考中…</span>';
+  // 1) 解析品类：店长锁定本店品类；总负责人可手动选或从问题中自动识别
+  let cat=null;
+  const catSel=document.getElementById('aiCatSel');
+  if(session.role!=='admin'){
+    cat=myCat();
+  } else if(catSel && catSel.value && catSel.value!=='auto'){
+    cat=catSel.value;
+  } else {
+    cat=detectCat(q);
+  }
+  // 2) 组装基础 prompt
   let prompt=q;
   if(q.startsWith('diagnose:')){
     if(session.role==='admin'){
@@ -1353,6 +1407,10 @@ async function aiAsk(){
     }
   }
   else if(window._revSeries){ prompt='诊断对象店铺数据：'+JSON.stringify(window._revSeries).slice(0,2500)+'\n用户问题：'+q; }
+  // 3) 注入品类属性上下文（核心：让 AI 按品类打法给方案）
+  const ctx=catCtx(cat);
+  if(ctx){ prompt+=ctx; }
+  else { prompt+='\n\n【提示】当前未识别到具体品类。若问题涉及具体直播间/品类，请先推断或反问用户品类，再按该品类的直播打法给出针对性方案，禁止给跨品类通用的空话。'; }
   const r=await callDeepSeek(prompt);
   if(r.err){ out.innerHTML=`<div class="callout amber"><b>AI 调用失败</b>${r.err}<br>${aiConfigured()?'':'请先在「DeepSeek 大模型配置」里填写代理地址（推荐）或直连 Key。'}</div>`; }
   else{ out.innerHTML=r.text; window._export={ title:'AI分析结论_'+new Date().toISOString().slice(0,10), md:'# AI 分析结论\n\n**问题**：'+q+'\n\n**生成时间**：'+new Date().toLocaleString('zh-CN')+'\n\n'+r.text }; }
@@ -1362,7 +1420,8 @@ async function aiAnalyzeStore(){
   if(!window._revSeries){ return; }
   if(!perm().ai){ alert('当前账号无 AI 分析权限'); return; }
   const s=window._revSeries; const cur=s.months[Object.keys(s.months).sort().pop()];
-  const prompt=`请对这家直播间做深度诊断：${JSON.stringify({店铺:s.store,国家:s.country,品类:s.cat,最新期数据:cur,周期数据:s.months,大盘基准:DATA.benchmark}).slice(0,4000)}\n请输出：1)核心问题定位 2)分维度数据分析 3)漏斗卡点 4)分优先级(P0/P1/P2)的优化方案（带具体动作、话术、预期指标）。`;
+  let prompt=`请对这家直播间做深度诊断：${JSON.stringify({店铺:s.store,国家:s.country,品类:s.cat,最新期数据:cur,周期数据:s.months,大盘基准:DATA.benchmark}).slice(0,4000)}\n请输出：1)核心问题定位 2)分维度数据分析 3)漏斗卡点 4)分优先级(P0/P1/P2)的优化方案（带具体动作、话术、预期指标）。`;
+  const ctx=catCtx(s.cat); if(ctx){ prompt+=ctx; }
   const r=await callDeepSeek(prompt);
   const box=document.createElement('div'); box.className='card'; box.innerHTML='<h3><span class="dot"></span>🤖 AI 深度分析报告</h3><div class="ai-out" style="margin-top:8px">'+(r.err?('<div class="callout amber"><b>调用失败</b>'+r.err+'</div>'):r.text)+'</div>';
   out.appendChild(box); box.scrollIntoView({behavior:'smooth'});
