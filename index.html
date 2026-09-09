@@ -1022,6 +1022,32 @@ function renderRankBar(el, pos){
 }
 
 // ================= 通用结论导出 =================
+// markdown 转 HTML（用于界面上正确显示 AI 输出，避免 ** # - 等符号乱码）
+function mdToHtml(md){
+  if(!md) return '';
+  let html = String(md);
+  html = html.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // 代码块
+  html = html.replace(/```([\s\S]*?)```/g, (m,p)=>'<pre style="background:var(--panel2);padding:10px;border-radius:8px;overflow:auto;font-size:12.5px;line-height:1.5">'+p+'</pre>');
+  // 标题
+  html = html.replace(/^#{1,6}\s+(.+)$/gm, (m,p)=>{
+    const lvl = (m.match(/^#+/)||[''])[0].length;
+    const size = lvl<=1 ? '15.5px' : (lvl<=2 ? '14.5px' : '13.5px');
+    const color = lvl<=1 ? 'var(--cyan)' : 'var(--text)';
+    return '<div style="font-weight:700;font-size:'+size+';color:'+color+';margin:12px 0 6px">'+p+'</div>';
+  });
+  // 无序列表
+  html = html.replace(/^[-*]\s+(.+)$/gm, '<div style="margin:4px 0;padding-left:4px">• $1</div>');
+  // 有序列表
+  html = html.replace(/^(\d+)[.、]\s+(.+)$/gm, '<div style="margin:4px 0">$1. $2</div>');
+  // 加粗
+  html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  // 行内代码
+  html = html.replace(/`([^`]+)`/g, '<code style="background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:12.5px">$1</code>');
+  // 换行
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
 function downloadText(filename, text){
   const blob = new Blob(['\ufeff'+text], {type:'text/plain;charset=utf-8'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href);
@@ -1621,7 +1647,7 @@ async function aiAsk(){
   else { prompt+='\n\n【提示】当前未识别到具体店铺/品类。若问题涉及具体直播间，请先推断或反问用户店铺/品类，再按该品类打法给出针对性方案，禁止给跨品类通用的空话。'; }
   const r=await callDeepSeek(prompt);
   if(r.err){ out.innerHTML=`<div class="callout amber"><b>AI 调用失败</b>${r.err}<br>${aiConfigured()?'':'请先在「DeepSeek 大模型配置」里填写代理地址（推荐）或直连 Key。'}</div>`; }
-  else{ out.innerHTML=r.text; window._export={ title:'AI分析结论_'+new Date().toISOString().slice(0,10), md:'# AI 分析结论\n\n**问题**：'+q+'\n\n**生成时间**：'+new Date().toLocaleString('zh-CN')+'\n\n'+r.text }; }
+  else{ out.innerHTML=`<div style="line-height:1.8;font-size:14px">${mdToHtml(r.text)}</div>`; window._export={ title:'AI分析结论_'+new Date().toISOString().slice(0,10), md:'# AI 分析结论\n\n**问题**：'+q+'\n\n**生成时间**：'+new Date().toLocaleString('zh-CN')+'\n\n'+r.text }; }
 }
 async function aiAnalyzeStore(){
   const out=document.getElementById('reviewResult');
@@ -1631,7 +1657,7 @@ async function aiAnalyzeStore(){
   let prompt=`请对这家直播间做深度诊断：${JSON.stringify({店铺:s.store,国家:s.country,品类:s.cat,最新期数据:cur,周期数据:s.months,大盘基准:DATA.benchmark}).slice(0,4000)}\n【全公司大盘达标线(中位数)】${JSON.stringify(benchSummary())}\n请逐指标对比达标线，明确输出：1)哪些指标异常、当前具体数值、与达标线差距多少 2)核心问题定位 3)漏斗卡点 4)分优先级(P0/P1/P2)的优化方案（带具体动作、话术、预期指标）。`;
   const ctx=catCtx(s.cat); if(ctx){ prompt+=ctx; }
   const r=await callDeepSeek(prompt);
-  const box=document.createElement('div'); box.className='card'; box.innerHTML='<h3><span class="dot"></span>🤖 AI 深度分析报告</h3><div class="ai-out" style="margin-top:8px">'+(r.err?('<div class="callout amber"><b>调用失败</b>'+r.err+'</div>'):r.text)+'</div>';
+  const box=document.createElement('div'); box.className='card'; box.innerHTML='<h3><span class="dot"></span>🤖 AI 深度分析报告</h3><div class="ai-out" style="margin-top:8px;line-height:1.8;font-size:14px">'+(r.err?('<div class="callout amber"><b>调用失败</b>'+r.err+'</div>'):mdToHtml(r.text))+'</div>';
   out.appendChild(box); box.scrollIntoView({behavior:'smooth'});
 }
 
@@ -1691,16 +1717,25 @@ function renderSketchSVG(sketch){
 // ===== 场景诊断报告渲染（原图标注 + 草图 + 文字）=====
 function renderSceneReport(base64, text, sizeInfo){
   let marks=[], sketch=null;
-  const jsonMatch=text.match(/```json\s*([\s\S]*?)```/);
+  // 宽容解析：优先 ```json 块，其次 ``` 任意块，再其次从全文提取含 marks 的 {...} 对象
+  let jsonStr=null, jsonBlock=null;
+  let m1=text.match(/```(?:json|JSON)?\s*([\s\S]*?)```/);
+  if(m1){ jsonStr=m1[1]; jsonBlock=m1[0]; }
+  else{
+    const m2=text.match(/\{[\s\S]*?"marks"\s*:\s*\[[\s\S]*?\]\s*,\s*"sketch"[\s\S]*?\}\s*\}/);
+    if(m2){ jsonStr=m2[0]; jsonBlock=m2[0]; }
+  }
   let cleanText=text;
-  if(jsonMatch){
+  if(jsonStr){
     try{
-      const obj=JSON.parse(jsonMatch[1].trim());
+      const obj=JSON.parse(jsonStr.trim());
       if(obj && obj.marks && obj.marks.length) marks=obj.marks;
       if(obj && obj.sketch) sketch=obj.sketch;
-      cleanText=text.replace(jsonMatch[0],'').trim();
+      cleanText=text.replace(jsonBlock,'').trim();
     }catch(e){}
   }
+  // 导出按钮
+  const exportBtns=`<div style="display:flex;gap:8px;margin:4px 0 10px"><button class="btn" style="padding:6px 12px" onclick="exportConclusion()">📥 导出结论</button><button class="btn ghost" style="padding:6px 12px" onclick="exportConclusionHtml()">导出报告(HTML)</button></div>`;
   // 原图 + 标注框
   let imgHtml='';
   if(base64){
@@ -1725,9 +1760,10 @@ function renderSceneReport(base64, text, sizeInfo){
   if(sketch && sketch.zones && sketch.zones.length){
     sketchHtml=renderSketchSVG(sketch);
   }
-  // 文字诊断
-  const textHtml = cleanText ? `<div class="card" style="margin-top:10px"><h4>📋 详细文字诊断</h4><div style="white-space:pre-wrap;line-height:1.8;font-size:14px">${cleanText}</div></div>` : '';
+  // 文字诊断（markdown 渲染，避免 ** # 等乱码）
+  const textHtml = cleanText ? `<div class="card" style="margin-top:10px"><h4>📋 详细文字诊断</h4><div style="line-height:1.8;font-size:14px">${mdToHtml(cleanText)}</div></div>` : '';
   return `<div style="margin-top:10px">
+    ${exportBtns}
     ${imgHtml}
     ${legendHtml}
     ${sketchHtml}
@@ -1783,7 +1819,10 @@ async function aiOptimizeScript(){
   prompt+='\n\n【原始话术脚本】\n'+script+'\n\n请输出：1)整体诊断 2)逐段优化（标注「原文问题 → 优化后话术 → 修改理由」）3)建议补充的钩子/逼单/信任话术（贴合该品类）。';
   const r=await callDeepSeek(prompt);
   if(r.err){ out.innerHTML=`<div class="callout amber"><b>优化失败</b>${r.err}</div>`; }
-  else{ out.innerHTML=r.text; window._export={title:'直播话术优化_'+new Date().toISOString().slice(0,10), md:'# 直播话术优化\n\n'+r.text}; }
+  else{
+    out.innerHTML=`<div style="display:flex;gap:8px;margin:4px 0 10px"><button class="btn" style="padding:6px 12px" onclick="exportConclusion()">📥 导出结论</button><button class="btn ghost" style="padding:6px 12px" onclick="exportConclusionHtml()">导出报告(HTML)</button></div><div style="line-height:1.8;font-size:14px">${mdToHtml(r.text)}</div>`;
+    window._export={title:'直播话术优化_'+new Date().toISOString().slice(0,10), md:'# 直播话术优化\n\n'+r.text};
+  }
 }
 
 // ================= 视图7：账号管理（admin） =================
