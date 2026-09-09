@@ -1397,51 +1397,70 @@ async function callDeepSeekVision(prompt, imageBase64){
   let key = directKey().replace(/[^\x00-\xFF]/g,'').trim();
   if(!key) return {err:'未配置 DeepSeek API Key'};
   if(!/^sk-[A-Za-z0-9]{20,}$/.test(key)) return {err:'直连 Key 格式异常，请检查是否含隐藏字符'};
-  const messages = [
-    {role:'system', content:DS_SYSTEM},
-    {role:'user', content:[
-      {type:'text', text:prompt},
-      {type:'image_url', image_url:{url:imageBase64, detail:'low'}}
-    ]}
-  ];
-  try{
+  const doCall = async (detail)=>{
+    const messages = [
+      {role:'system', content:DS_SYSTEM},
+      {role:'user', content:[
+        {type:'text', text:prompt},
+        {type:'image_url', image_url:{url:imageBase64, detail:detail}}
+      ]}
+    ];
     const bodyStr=JSON.stringify({model:'deepseek-v4-flash-vision-exp',messages,temperature:0.7,max_tokens:1500});
-    // 浏览器 fetch 对大 body 有实际限制，超过则提前拦截，避免空响应
     if(bodyStr.length > 8*1024*1024) return {err:'请求体超过 8MB（图片或提示词过大）。请换张更小的图片，或先压缩到 1MB 以内再上传。'};
-    const res=await fetch('https://api.deepseek.com/chat/completions',{method:'POST',
-      headers:{'Content-Type':'application/json; charset=utf-8','Authorization':'Bearer '+key},
-      body:bodyStr});
-    const j=await res.json();
-    if(j.error) return {err:(j.error.message||'API错误') + (j.error.code?` (code: ${j.error.code})`:'') + ` (HTTP ${res.status})`};
-    const choice=j.choices && j.choices[0];
-    if(!choice){ return {err:`API 未返回 choices（HTTP ${res.status}），原始响应：`+JSON.stringify(j).slice(0,200)}; }
-    if(!choice.message || !choice.message.content){
-      const reason = choice.finish_reason || 'unknown';
-      return {err:`视觉模型返回空内容（finish_reason=${reason}）。可能原因：①图片过大/格式特殊（请压缩到 1MB 以内、用 JPG）②提示词过长（已精简）③实验版模型波动（重试）。body 大小：`+Math.round(bodyStr.length/1024)+'KB'};
-    }
-    return {text:choice.message.content};
-  }catch(e){ return {err:'调用失败：'+String(e)}; }
+    try{
+      const res=await fetch('https://api.deepseek.com/chat/completions',{method:'POST',
+        headers:{'Content-Type':'application/json; charset=utf-8','Authorization':'Bearer '+key},
+        body:bodyStr});
+      const j=await res.json();
+      if(j.error) return {err:(j.error.message||'API错误') + (j.error.code?` (code: ${j.error.code})`:'') + ` (HTTP ${res.status})`};
+      const choice=j.choices && j.choices[0];
+      if(!choice){ return {err:`API 未返回 choices（HTTP ${res.status}），原始响应：`+JSON.stringify(j).slice(0,200)}; }
+      if(choice.message && choice.message.content) return {text:choice.message.content};
+      return {empty:true, reason:choice.finish_reason||'unknown', size:Math.round(bodyStr.length/1024)};
+    }catch(e){ return {err:'调用失败：'+String(e)}; }
+  };
+  let r1=await doCall('low');
+  if(r1.text) return r1;
+  if(r1.err) return r1;
+  // 空内容 → 换 detail=high 重试一次（实验版模型偶发波动）
+  let r2=await doCall('high');
+  if(r2.text) return r2;
+  if(r2.err) return r2;
+  return {err:`视觉模型两次均返回空内容（finish_reason=${r2.reason||'unknown'}）。可能原因：①图片内容无法被识别（换张更清晰的 JPG 重试）②实验版模型波动（稍后重试）③图片含特殊内容。body 约 ${r2.size}KB。`};
 }
 
-// 图片压缩为 base64 data URL（控制体积，适配视觉模型内联输入）
+// 图片压缩为 base64 data URL（控制体积，适配视觉模型内联输入；多层兜底，绝不返回空/损坏 base64）
 function compressImage(file, maxW, quality){
   maxW = maxW || 1024; quality = quality || 0.75;
   return new Promise((resolve, reject)=>{
     const reader = new FileReader();
     reader.onload = (e)=>{
+      const rawDataUrl = e.target.result; // 原始 data URL，作为最终保底
+      if(!rawDataUrl){ reject(new Error('文件读取结果为空')); return; }
+      // 原始图片已较小（<400KB base64），直接传原始，避免 canvas 处理风险
+      if(rawDataUrl.length < 400*1024){ resolve(rawDataUrl); return; }
+      // 大图才走 canvas 压缩
       const img = new Image();
       img.onload = ()=>{
-        const w=img.width, h=img.height;
-        const scale=Math.min(1, maxW/w);
-        const cw=Math.max(1, Math.round(w*scale)), ch=Math.max(1, Math.round(h*scale));
-        const canvas=document.createElement('canvas');
-        canvas.width=cw; canvas.height=ch;
-        const ctx=canvas.getContext('2d');
-        ctx.drawImage(img,0,0,cw,ch);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        try{
+          const w=img.width, h=img.height;
+          if(!w || !h){ resolve(rawDataUrl); return; }
+          const scale=Math.min(1, maxW/w);
+          const cw=Math.max(1, Math.round(w*scale)), ch=Math.max(1, Math.round(h*scale));
+          const canvas=document.createElement('canvas');
+          canvas.width=cw; canvas.height=ch;
+          const ctx=canvas.getContext('2d');
+          if(!ctx){ resolve(rawDataUrl); return; }
+          ctx.drawImage(img,0,0,cw,ch);
+          // 关键：检查 toDataURL 结果，空/损坏则回退原始
+          let out='';
+          try{ out=canvas.toDataURL('image/jpeg', quality); }catch(e2){ out=''; }
+          if(out && out.length > 100){ resolve(out); }
+          else{ resolve(rawDataUrl); } // canvas 结果异常 → 回退原始图
+        }catch(err){ resolve(rawDataUrl); } // 任何异常 → 回退原始图
       };
-      img.onerror=()=>reject(new Error('图片加载失败'));
-      img.src=e.target.result;
+      img.onerror=()=>resolve(rawDataUrl); // 图片加载失败 → 回退原始
+      img.src=rawDataUrl;
     };
     reader.onerror=()=>reject(new Error('文件读取失败'));
     reader.readAsDataURL(file);
@@ -1625,7 +1644,8 @@ async function aiAnalyzeScene(){
   if(!fileInput || !fileInput.files || !fileInput.files.length){ out.innerHTML='<span style="color:var(--dim)">请先上传直播间场景截图</span>'; return; }
   out.innerHTML='<span class="typing">▍ DeepSeek 正在识别场景…</span>';
   try{
-    const base64=await compressImage(fileInput.files[0]);
+    const file=fileInput.files[0];
+    const base64=await compressImage(file);
     const st=getTargetStore('scene');
     let prompt='请识别这张【直播间场景截图】，从「灯光布光、背景氛围、产品陈列、画面布局与构图、主播/产品位置、画面贴片与文字、色彩与清晰度」等维度，逐项指出当前存在的问题，并给出可落地的优化建议（贴合该品类）。';
     if(st){
@@ -1640,7 +1660,8 @@ async function aiAnalyzeScene(){
       const ctx=catCtx(s.cat); if(ctx) prompt+=ctx;
     }
     const r=await callDeepSeekVision(prompt, base64);
-    if(r.err){ out.innerHTML=`<div class="callout amber"><b>识别失败</b>${r.err}</div>`; }
+    const sizeInfo=`<span style="color:var(--dim)">（原图 ${Math.round(file.size/1024)}KB → 处理后约 ${Math.round(base64.length*3/4/1024)}KB）</span>`;
+    if(r.err){ out.innerHTML=`<div class="callout amber"><b>识别失败</b>${r.err}<br>${sizeInfo}</div>`; }
     else{ out.innerHTML=r.text; window._export={title:'直播间场景诊断_'+new Date().toISOString().slice(0,10), md:'# 直播间场景诊断\n\n'+r.text}; }
   }catch(e){ out.innerHTML='<div class="callout amber"><b>图片处理失败</b>'+String(e)+'</div>'; }
 }
