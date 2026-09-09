@@ -1231,9 +1231,11 @@ function viewStandard(){
 const DS_SYSTEM='你是资深跨境电商直播运营分析专家，精通 TikTok/Shopee/Lazada 直播带货。你擅长用数据定位直播间卡点，输出可落地、带预期指标的优化方案。回答专业、犀利、结构化，用中文，直接给结论和动作，不空谈方向。';
 
 // ===== Key 安全存储：优先走服务端代理（Key 不落前端），直连 Key 仅作可选兜底 =====
+// 内置默认 DeepSeek Key（所有账号默认可用；总负责人可在配置页覆盖）
+const DEFAULT_DS_KEY = 'sk-41c5f526a7224b8dab5e14adfcfeca6f';
 function proxyUrl(){ return (localStorage.getItem('liveops_proxy_url')||'').trim(); }
 function proxyToken(){ return localStorage.getItem('liveops_proxy_token')||''; }
-function directKey(){ return localStorage.getItem('liveops_ds_key')||''; }
+function directKey(){ return localStorage.getItem('liveops_ds_key') || DEFAULT_DS_KEY; }
 function setProxyUrl(v){ if(v) localStorage.setItem('liveops_proxy_url',v.trim()); else localStorage.removeItem('liveops_proxy_url'); }
 function setProxyToken(v){ if(v) localStorage.setItem('liveops_proxy_token',v); else localStorage.removeItem('liveops_proxy_token'); }
 function setDirectKey(v){ if(v) localStorage.setItem('liveops_ds_key',v.replace(/[^\x00-\xFF]/g,'').trim()); else localStorage.removeItem('liveops_ds_key'); }
@@ -1276,11 +1278,13 @@ function viewAI(){
   const mc=document.getElementById('mainContent');
   const pUrl=proxyUrl(), pTok=proxyToken(), dKey=directKey();
   const usingProxy=!!pUrl, usingDirect=!!dKey;
+  const isAdminUser = session.role==='admin';
   mc.innerHTML=`
   <div class="h-title">🧠 AI 知识库 <span class="tag">DeepSeek</span></div>
-  <div class="h-sub">内置直播运营知识库 + DeepSeek 大模型深度分析（推荐通过服务端代理调用，Key 不暴露在前端）</div>
+  <div class="h-sub">内置直播运营知识库 + DeepSeek 大模型深度分析${isAdminUser?'':'（AI 已就绪，直接提问即可）'}</div>
 
-  <div class="card"><h3><span class="dot"></span>DeepSeek 大模型配置</h3>
+  ${isAdminUser ? `
+  <div class="card"><h3><span class="dot"></span>DeepSeek 大模型配置（仅总负责人可见）</h3>
     <div class="desc">方式一「服务端代理」最安全（Key 存在服务端环境变量）；方式二「直连 Key」仅作临时兜底（Key 存本机浏览器）</div>
 
     <div style="padding:14px;background:var(--panel2);border-radius:12px;margin-bottom:14px">
@@ -1294,21 +1298,21 @@ function viewAI(){
     </div>
 
     <div style="padding:14px;background:var(--panel2);border-radius:12px">
-      <b style="font-size:13.5px;color:var(--amber)">方式二 · 直连 Key（临时兜底，不推荐）</b>
-      <div class="hint">Key 仅存本机浏览器，每次跨设备需重新填；长期使用请改用代理</div>
+      <b style="font-size:13.5px;color:var(--amber)">方式二 · 直连 Key（覆盖内置默认 Key）</b>
+      <div class="hint">当前已内置默认 Key，所有账号可直接使用；此处可换成你自己的 Key（仅存本机浏览器）</div>
       <div style="display:flex;gap:10px"><input class="inp" id="dsKeyInput" type="password" placeholder="sk-..." style="max-width:420px" value="${usingDirect?'••••••••••••••••':''}">
       <button class="btn" onclick="saveDsKey()">${usingDirect?'更新':'保存'} Key</button>
-      ${usingDirect?'<button class="btn ghost" onclick="setDirectKey(\'\');location.reload()">清除</button>':''}</div>
+      ${usingDirect?'<button class="btn ghost" onclick="setDirectKey(\'\');location.reload()">恢复内置默认 Key</button>':''}</div>
     </div>
 
-    <div class="hint" style="margin-top:10px">${usingProxy?'✅ 已配置服务端代理，AI 走代理调用（Key 不暴露）':(usingDirect?'⚠️ 当前用直连 Key（仅本机）':'⚠️ 未配置，AI 分析将提示配置代理或 Key')}</div>
-  </div>
+    <div class="hint" style="margin-top:10px">${usingProxy?'✅ 已配置服务端代理，AI 走代理调用（Key 不暴露）':(usingDirect?'⚠️ 当前用自定义直连 Key':'✅ 当前用内置默认 Key，所有账号可直接调用')}</div>
+  </div>` : ''}
 
   <div class="card"><h3><span class="dot"></span>AI 问答（直播诊断 / 脚本 / 话术）</h3>
     <div class="desc">输入问题，AI 结合大盘数据与直播知识库回答</div>
     <textarea id="aiPrompt" placeholder="例如：某母婴店 PCR 只有 2%，观看时长 30 秒，该如何提升转化？请给出具体动作和话术。"></textarea>
     <div class="btn-row"><button class="btn" onclick="aiAsk()">🤖 提问</button>
-      <button class="btn ghost" onclick="document.getElementById('aiPrompt').value='diagnose:对当前大盘数据做整体诊断，指出最需关注的国家/品类和Top3机会点'">用大盘诊断示例</button></div>
+      <button class="btn ghost" onclick="document.getElementById('aiPrompt').value='diagnose:${isAdminUser?'对当前大盘数据做整体诊断，指出最需关注的国家/品类和Top3机会点':'对我的店铺做整体诊断，指出核心卡点和Top3优化机会'}'">${isAdminUser?'用大盘诊断示例':'用本店诊断示例'}</button></div>
     <div class="ai-out" id="aiOut"><span style="color:var(--dim)">回答将显示在这里…</span></div>
     <div class="btn-row" style="margin-top:10px"><button class="btn ghost" onclick="exportConclusion()">📥 导出 AI 结论</button><button class="btn ghost" onclick="exportConclusionHtml()">导出报告(HTML)</button></div>
   </div>
