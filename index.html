@@ -1260,6 +1260,21 @@ function detectCat(text){
   for(const k of sorted){ if(text.indexOf(k)>=0) return k; }
   return null;
 }
+// 从问题文本识别店铺名（匹配数据库 store_series 的键，类目固定来源）
+function detectStore(text){
+  if(!text) return null;
+  const keys=Object.keys(DATA.store_series).sort((a,b)=>b.length-a.length);
+  for(const k of keys){ if(text.indexOf(k)>=0) return k; }
+  return null;
+}
+// 大盘基准达标线摘要（各指标中位数，用于量化对比"当前值 vs 达标线"）
+function benchSummary(){
+  const b=DATA.benchmark||{};
+  const map={gmv:'直播GMV',avg_gmv:'场均GMV',pcr:'支付转化率PCR%',ctr:'商品点击率CTR%',watch:'平均观看时长(秒)',follow:'新关注量',aov:'客单价',ratio:'直播业绩占比%',sess:'直播场次',exposure:'产品曝光量'};
+  const out={};
+  Object.keys(map).forEach(k=>{ if(b[k]&&b[k].p50!=null) out[map[k]]=b[k].p50; });
+  return out;
+}
 // ===== 通用直播方法论库（来源：抖音生活服务学习中心/巨量引擎/蝉妈妈等公开方法论，核验 2026-09）=====
 const LIVE_METHOD={
   '货盘黄金三角':'引流款10%(9.9/秒杀拉停留)+爆款60%(冲GMV)+利润款30%(提客单)。',
@@ -1413,12 +1428,11 @@ function viewAI(){
   </div>` : ''}
 
   <div class="card"><h3><span class="dot"></span>AI 问答（直播诊断 / 脚本 / 话术）</h3>
-    <div class="desc">输入问题，AI 结合大盘数据、品类属性与直播知识库回答（按品类给出针对性方案）</div>
-    <div class="hint" style="margin-bottom:6px">🏷️ 直播间品类（AI 将严格按此品类给出方案）</div>
+    <div class="desc">输入问题，AI 自动识别店铺 → 按数据库固定类目 + 该店历史数据 + 大盘基准做量化诊断</div>
     ${isAdminUser
-      ? `<select class="sel" id="aiCatSel" style="max-width:360px;margin-bottom:10px"><option value="auto">自动识别（从问题中推断品类）</option>${ALL_CATS.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>`
-      : `<div class="hint" style="margin-bottom:10px">已锁定本店品类：<b style="color:var(--cyan)">${myCat()||'未标注'}</b>（店长账号自动按本店品类回答）</div>`}
-    <textarea id="aiPrompt" placeholder="例如：PCR 只有 2%，观看时长 30 秒，该如何提升转化？请给出具体动作和话术。"></textarea>
+      ? `<div class="hint" style="margin-bottom:10px">🏷️ 类目判定规则：<b>从问题中提到的店铺名自动匹配该店铺在数据库中的固定类目</b>（固定、不可手动更改）；问题未提店铺时，才从文字推断品类。可在问题里直接写店铺名，例如「XX店铺的PCR为什么低」。</div>`
+      : `<div class="hint" style="margin-bottom:10px">已锁定本店：<b style="color:var(--cyan)">${myStore()||'未绑定'}</b>（类目：${myCat()||'未标注'}）。AI 将自动调取本店历史数据 + 大盘基准做量化诊断。</div>`}
+    <textarea id="aiPrompt" placeholder="例如：我的店铺 PCR 只有 2%、观看时长 30 秒，是哪个指标异常？具体差多少？该怎么优化？"></textarea>
     <div class="btn-row"><button class="btn" onclick="aiAsk()">🤖 提问</button>
       <button class="btn ghost" onclick="document.getElementById('aiPrompt').value='diagnose:${isAdminUser?'对当前大盘数据做整体诊断，指出最需关注的国家/品类和Top3机会点':'对我的店铺做整体诊断，指出核心卡点和Top3优化机会'}'">${isAdminUser?'用大盘诊断示例':'用本店诊断示例'}</button></div>
     <div class="ai-out" id="aiOut"><span style="color:var(--dim)">回答将显示在这里…</span></div>
@@ -1462,31 +1476,46 @@ async function aiAsk(){
   const out=document.getElementById('aiOut'); const q=document.getElementById('aiPrompt').value.trim();
   if(!q){ out.innerHTML='<span style="color:var(--dim)">请先输入问题</span>'; return; }
   out.innerHTML='<span class="typing">▍ DeepSeek 思考中…</span>';
-  // 1) 解析品类：店长锁定本店品类；总负责人可手动选或从问题中自动识别
+
+  // 1) 解析目标店铺：店长锁定本店；总负责人从问题文本识别店铺名（类目固定来自数据库，不再手动选择）
+  let targetStore=null;
+  if(session.role!=='admin'){ targetStore=myStore(); }
+  else { targetStore=detectStore(q); }
+
+  // 2) 类目固定：优先取目标店铺在数据库中的固定类目；无店铺时才从文本识别品类关键词
   let cat=null;
-  const catSel=document.getElementById('aiCatSel');
-  if(session.role!=='admin'){
-    cat=myCat();
-  } else if(catSel && catSel.value && catSel.value!=='auto'){
-    cat=catSel.value;
-  } else {
-    cat=detectCat(q);
-  }
-  // 2) 组装基础 prompt
+  if(targetStore){ cat=(DATA.store_series[targetStore]||{}).cat||null; }
+  if(!cat){ cat=detectCat(q); }
+
+  // 3) 组装基础 prompt
   let prompt=q;
   if(q.startsWith('diagnose:')){
-    if(session.role==='admin'){
+    if(session.role==='admin' && !targetStore){
       prompt='请基于以下全公司直播大盘数据做整体诊断：'+JSON.stringify({月度:DATA.monthly,国家:DATA.classification.country,大盘基准:DATA.benchmark}).slice(0,3000)+'\n请指出最需关注的国家/品类和Top3机会点，给出可落地建议。';
     } else {
-      const s = DATA.store_series[myStore()];
-      prompt='请基于「我的店铺」数据与全公司大盘基准（分位数达标线）做诊断：'+JSON.stringify({我的店铺:s,大盘基准:DATA.benchmark}).slice(0,3000)+'\n请指出我的店铺核心卡点与Top3优化机会，给出可落地建议。';
+      const st=targetStore||myStore();
+      const s=DATA.store_series[st];
+      prompt='请基于「'+st+'」店铺数据与全公司大盘基准做诊断：'+JSON.stringify({店铺数据:s,大盘基准:DATA.benchmark}).slice(0,3500)+'\n请指出该店铺核心卡点与Top3优化机会，给出可落地建议。';
     }
   }
-  else if(window._revSeries){ prompt='诊断对象店铺数据：'+JSON.stringify(window._revSeries).slice(0,2500)+'\n用户问题：'+q; }
-  // 3) 注入品类属性上下文（核心：让 AI 按品类打法给方案）
+
+  // 4) 注入店铺历史数据 + 大盘基准达标线（核心：让 AI 逐指标量化诊断）
+  if(targetStore){
+    const s=DATA.store_series[targetStore];
+    if(s){
+      prompt+='\n\n【该店铺历史经营数据（请逐指标对比大盘达标线，明确回答：①哪个指标异常 ②当前具体数值 vs 大盘达标线 ③差距多少 ④怎么优化、预期做到多少）】';
+      prompt+='\n店铺：'+targetStore+'（'+(s.country||'')+' · '+(s.cat||'')+' · '+(s.manager||'')+'）';
+      prompt+='\n历史数据：'+JSON.stringify(s).slice(0,3200);
+      prompt+='\n\n【全公司大盘基准达标线（中位数，某指标低于此值即为短板、异常）】'+JSON.stringify(benchSummary());
+    }
+  } else if(window._revSeries){
+    prompt='诊断对象店铺数据：'+JSON.stringify(window._revSeries).slice(0,2500)+'\n用户问题：'+q;
+  }
+
+  // 5) 注入品类属性上下文（方法论+品类打法+案例）
   const ctx=catCtx(cat);
   if(ctx){ prompt+=ctx; }
-  else { prompt+='\n\n【提示】当前未识别到具体品类。若问题涉及具体直播间/品类，请先推断或反问用户品类，再按该品类的直播打法给出针对性方案，禁止给跨品类通用的空话。'; }
+  else { prompt+='\n\n【提示】当前未识别到具体店铺/品类。若问题涉及具体直播间，请先推断或反问用户店铺/品类，再按该品类打法给出针对性方案，禁止给跨品类通用的空话。'; }
   const r=await callDeepSeek(prompt);
   if(r.err){ out.innerHTML=`<div class="callout amber"><b>AI 调用失败</b>${r.err}<br>${aiConfigured()?'':'请先在「DeepSeek 大模型配置」里填写代理地址（推荐）或直连 Key。'}</div>`; }
   else{ out.innerHTML=r.text; window._export={ title:'AI分析结论_'+new Date().toISOString().slice(0,10), md:'# AI 分析结论\n\n**问题**：'+q+'\n\n**生成时间**：'+new Date().toLocaleString('zh-CN')+'\n\n'+r.text }; }
@@ -1496,7 +1525,7 @@ async function aiAnalyzeStore(){
   if(!window._revSeries){ return; }
   if(!perm().ai){ alert('当前账号无 AI 分析权限'); return; }
   const s=window._revSeries; const cur=s.months[Object.keys(s.months).sort().pop()];
-  let prompt=`请对这家直播间做深度诊断：${JSON.stringify({店铺:s.store,国家:s.country,品类:s.cat,最新期数据:cur,周期数据:s.months,大盘基准:DATA.benchmark}).slice(0,4000)}\n请输出：1)核心问题定位 2)分维度数据分析 3)漏斗卡点 4)分优先级(P0/P1/P2)的优化方案（带具体动作、话术、预期指标）。`;
+  let prompt=`请对这家直播间做深度诊断：${JSON.stringify({店铺:s.store,国家:s.country,品类:s.cat,最新期数据:cur,周期数据:s.months,大盘基准:DATA.benchmark}).slice(0,4000)}\n【全公司大盘达标线(中位数)】${JSON.stringify(benchSummary())}\n请逐指标对比达标线，明确输出：1)哪些指标异常、当前具体数值、与达标线差距多少 2)核心问题定位 3)漏斗卡点 4)分优先级(P0/P1/P2)的优化方案（带具体动作、话术、预期指标）。`;
   const ctx=catCtx(s.cat); if(ctx){ prompt+=ctx; }
   const r=await callDeepSeek(prompt);
   const box=document.createElement('div'); box.className='card'; box.innerHTML='<h3><span class="dot"></span>🤖 AI 深度分析报告</h3><div class="ai-out" style="margin-top:8px">'+(r.err?('<div class="callout amber"><b>调用失败</b>'+r.err+'</div>'):r.text)+'</div>';
