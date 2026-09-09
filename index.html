@@ -1405,7 +1405,7 @@ async function callDeepSeekVision(prompt, imageBase64){
         {type:'image_url', image_url:{url:imageBase64, detail:detail}}
       ]}
     ];
-    const bodyStr=JSON.stringify({model:'deepseek-v4-flash-vision-exp',messages,temperature:0.7,max_tokens:3000});
+    const bodyStr=JSON.stringify({model:'deepseek-v4-flash-vision-exp',messages,temperature:0.7,max_tokens:6000});
     if(bodyStr.length > 8*1024*1024) return {err:'请求体超过 8MB（图片或提示词过大）。请换张更小的图片，或先压缩到 1MB 以内再上传。'};
     try{
       const res=await fetch('https://api.deepseek.com/chat/completions',{method:'POST',
@@ -1754,7 +1754,7 @@ async function aiAnalyzeScene(){
       prompt+='\n【大盘达标线(中位数)】'+JSON.stringify(benchSummary());
       const ctx=catCtx(s.cat); if(ctx) prompt+=ctx;
     }
-    prompt+='\n\n请务必在文字诊断之后，再输出一段【图上标注 + 优化草图】数据，严格用三个反引号 json 包裹（放在最后），格式如下：\n```json\n{\n  "marks": [\n    {"n":1, "label":"灯光", "x":15, "y":10, "w":40, "h":20, "issue":"顶光偏暗且不均匀", "fix":"顶部加2盏环形补光灯，色温5500K"},\n    {"n":2, "label":"产品陈列", "x":55, "y":30, "w":35, "h":40, "issue":"产品摆放零散", "fix":"主推品前置居中，按价格梯队排列"}\n  ],\n  "sketch": {\n    "title":"优化后直播间布局草图",\n    "zones":["主播居中偏左","主推产品右侧前景陈列","背景墙放品牌logo+活动贴片","左右45度各一盏补光灯","前景桌面放引流款+价格牌"]\n  }\n}\n```\n其中 marks 的 x/y/w/h 都是相对图片宽高的百分比(0-100)，标注画面中每个需要调整的区域（至少 3-6 个）；sketch.zones 是优化后布局的要点（5-7 条），用于绘制布局草图。';
+    prompt+='\n\n请务必在文字诊断之后，再输出一段【图上标注 + 优化草图】数据，严格用三个反引号 json 包裹（放在最后）。注意：marks 给 3-5 个最关键的标注即可（不要超过 6 个），每个 issue/fix 不超过 25 字；sketch.zones 给 5 条布局要点即可。格式：\n```json\n{\n  "marks": [\n    {"n":1, "label":"灯光", "x":15, "y":10, "w":40, "h":20, "issue":"顶光偏暗", "fix":"加2盏环形补光灯"},\n    {"n":2, "label":"产品陈列", "x":55, "y":30, "w":35, "h":40, "issue":"产品零散", "fix":"主推品前置居中"}\n  ],\n  "sketch": {\n    "title":"优化后直播间布局草图",\n    "zones":["主播居中偏左","主推产品右侧前景陈列","背景墙放品牌logo+活动贴片","左右45度各一盏补光灯","前景桌面放引流款+价格牌"]\n  }\n}\n```\n坐标 x/y/w/h 是图片宽高的百分比(0-100)。';
     const r=await callDeepSeekVision(prompt, base64);
     const sizeInfo=`<span style="color:var(--dim)">（原图 ${Math.round(file.size/1024)}KB → 处理后约 ${Math.round(base64.length*3/4/1024)}KB）</span>`;
     if(r.err){ out.innerHTML=`<div class="callout amber"><b>识别失败</b>${r.err}<br>${sizeInfo}</div>`; }
