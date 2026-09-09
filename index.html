@@ -1058,16 +1058,23 @@ function exportConclusion(){
 }
 function exportConclusionHtml(){
   if(!window._export || !window._export.md){ alert('当前页面暂无结论可导出'); return; }
-  const body = String(window._export.md)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/^### (.*)$/gm,'<h3>$1</h3>')
-    .replace(/^## (.*)$/gm,'<h2>$1</h2>')
-    .replace(/^# (.*)$/gm,'<h1>$1</h1>')
-    .replace(/^\* (.*)$/gm,'<li>$1</li>')
-    .replace(/^- (.*)$/gm,'<li>$1</li>')
-    .replace(/\*\*(.*?)\*\*/g,'<b>$1</b>')
-    .replace(/\n/g,'<br>');
-  const html = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>'+window._export.title+'</title><style>body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:820px;margin:40px auto;padding:0 24px;color:#262626;line-height:1.8}h1{font-size:24px}h2{font-size:19px;border-bottom:2px solid #833ab4;padding-bottom:6px;margin-top:28px}h3{font-size:16px;color:#405de6;margin-top:20px}li{margin:4px 0}</style></head><body>'+body+'</body></html>';
+  let body;
+  if(window._export.html){
+    // 场景诊断等：已含原图标注 + 草图 + 文字诊断的完整 HTML
+    body = window._export.html;
+  } else {
+    body = String(window._export.md)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/^### (.*)$/gm,'<h3>$1</h3>')
+      .replace(/^## (.*)$/gm,'<h2>$1</h2>')
+      .replace(/^# (.*)$/gm,'<h1>$1</h1>')
+      .replace(/^\* (.*)$/gm,'<li>$1</li>')
+      .replace(/^- (.*)$/gm,'<li>$1</li>')
+      .replace(/\*\*(.*?)\*\*/g,'<b>$1</b>')
+      .replace(/\n/g,'<br>');
+  }
+  const css = ':root{--border:#ececee;--panel2:#f6f6f8;--text:#262626;--muted:#737373;--orange:#ea580c;--cyan:#833ab4}body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:820px;margin:40px auto;padding:0 24px;color:#262626;line-height:1.8}h1{font-size:24px}h2{font-size:19px;border-bottom:2px solid #833ab4;padding-bottom:6px;margin-top:28px}h3{font-size:16px;color:#405de6;margin-top:20px}li{margin:4px 0}.card{background:#ffffff;border:1px solid #ececee;border-radius:12px;padding:16px;margin:14px 0}.card h4{margin:0 0 8px;font-size:15px}img{max-width:100%;height:auto}';
+  const html = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>'+window._export.title+'</title><style>'+css+'</style></head><body>'+body+'</body></html>';
   downloadText(window._export.title + '.html', html);
 }
 function exportBtn(align){
@@ -1764,14 +1771,11 @@ function renderSceneReport(base64, text, sizeInfo){
   }
   // 文字诊断（markdown 渲染，避免 ** # 等乱码）
   const textHtml = cleanText ? `<div class="card" style="margin-top:10px"><h4>📋 详细文字诊断</h4><div style="line-height:1.8;font-size:14px">${mdToHtml(cleanText)}</div></div>` : '';
-  return `<div style="margin-top:10px">
-    ${exportBtns}
-    ${imgHtml}
-    ${legendHtml}
-    ${sketchHtml}
-    ${textHtml}
-    <div style="margin-top:8px">${sizeInfo}</div>
-  </div>`;
+  const contentHtml = imgHtml + legendHtml + sketchHtml + textHtml;
+  return {
+    display: `<div style="margin-top:10px">${exportBtns}${contentHtml}<div style="margin-top:8px">${sizeInfo}</div></div>`,
+    content: contentHtml
+  };
 }
 
 // ===== 直播间场景图片识别诊断 =====
@@ -1800,7 +1804,7 @@ async function aiAnalyzeScene(){
     const r=await callDeepSeekVision(prompt, base64);
     const sizeInfo=`<span style="color:var(--dim)">（原图 ${Math.round(file.size/1024)}KB → 处理后约 ${Math.round(base64.length*3/4/1024)}KB）</span>`;
     if(r.err){ out.innerHTML=`<div class="callout amber"><b>识别失败</b>${r.err}<br>${sizeInfo}</div>`; }
-    else{ out.innerHTML=renderSceneReport(base64, r.text, sizeInfo); window._export={title:'直播间场景诊断_'+new Date().toISOString().slice(0,10), md:'# 直播间场景诊断\n\n'+r.text}; }
+    else{ const rep=renderSceneReport(base64, r.text, sizeInfo); out.innerHTML=rep.display; window._export={title:'直播间场景诊断_'+new Date().toISOString().slice(0,10), md:'# 直播间场景诊断\n\n'+r.text, html:rep.content}; }
   }catch(e){ out.innerHTML='<div class="callout amber"><b>图片处理失败</b>'+String(e)+'</div>'; }
 }
 
