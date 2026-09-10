@@ -2008,35 +2008,27 @@ function commitActions(store, rawActions, source){
   });
   saveActions(all); return added;
 }
-// —— 钉钉加签（HMAC-SHA256 + base64 + URL编码）——
-async function dingSign(secret){
-  const timestamp=Date.now(); const stringToSign=timestamp+'\n'+secret;
-  const enc=new TextEncoder();
-  const key=await crypto.subtle.importKey('raw', enc.encode(secret), {name:'HMAC',hash:'SHA-256'}, false, ['sign']);
-  const sig=await crypto.subtle.sign('HMAC', key, enc.encode(stringToSign));
-  const base64=btoa(String.fromCharCode(...new Uint8Array(sig)));
-  return {timestamp, sign:encodeURIComponent(base64)};
-}
-// —— 钉钉推送（markdown 卡片）——
+// —— 钉钉推送（必须走代理，钉钉 webhook 不支持 CORS，浏览器直连会被拒）——
 async function dingPush(title, text){
   const cfg=getDingCfg();
   if(!cfg.webhook || !cfg.webhook.trim()) return {err:'未配置钉钉机器人 webhook 地址（请在下方「钉钉推送配置」填写）'};
+  const pUrl=proxyUrl();
+  if(!pUrl) return {err:'钉钉推送需要先部署代理（AI 知识库 → 代理地址），因为钉钉 webhook 不支持浏览器直连 CORS。详见「服务端代理/部署指南.md」'};
+  const payload={msgtype:'markdown', markdown:{title:title, text:text}};
   try{
-    let url=cfg.webhook.trim();
-    if(cfg.secret && cfg.secret.trim()){
-      const s=await dingSign(cfg.secret.trim());
-      url+=(url.indexOf('?')>=0?'&':'?')+'timestamp='+s.timestamp+'&sign='+s.sign;
-    }
-    const payload={msgtype:'markdown', markdown:{title:title, text:text}};
-    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const headers={'Content-Type':'application/json; charset=utf-8'};
+    const t=proxyToken(); if(t) headers['X-Auth-Token']=t;
+    const res=await fetch(pUrl.replace(/\/+$/,'')+'/dingtalk',{
+      method:'POST', headers,
+      body: JSON.stringify({webhook: cfg.webhook.trim(), secret: (cfg.secret||'').trim(), payload})
+    });
     const j=await res.json().catch(()=>({}));
     if(j.errcode && j.errcode!==0){
-      if(j.errcode===310000) return {err:'机器人已开启「加签」安全设置，请在下方「钉钉推送配置」填写加签密钥（SEC 开头的字符串）'};
-      if(j.errcode===300001 || j.errcode===310000) return {err:'推送被拒：'+(j.errmsg||('errcode '+j.errcode))};
+      if(j.errcode===310000) return {err:'机器人已开启「加签」安全设置，请检查加签密钥（SEC 开头）是否正确'};
       return {err:'钉钉返回错误：'+(j.errmsg||('errcode '+j.errcode))};
     }
     return {ok:true};
-  }catch(e){ return {err:'推送失败：'+String(e)}; }
+  }catch(e){ return {err:'推送失败：'+String(e)+'（请确认代理已部署 /chat 和 /dingtalk 端点）'}; }
 }
 // 组装单条行动项的钉钉 markdown
 function actionMd(a){
@@ -2119,7 +2111,7 @@ function viewActions(){
   ${isAdmin?`
   <div class="card" style="margin-bottom:14px">
     <h3><span class="dot"></span>钉钉推送配置</h3>
-    <div class="desc">配置后，可一键把未完成的行动项推送到钉钉群（群机器人 webhook）。webhook 地址与加签密钥在钉钉群「群设置 → 智能群助手 → 添加机器人 → 自定义」中获取。</div>
+    <div class="desc">⚠️ 钉钉 webhook <b>不支持浏览器直连</b>（CORS 限制），推送必须走服务端代理。请先在「AI 知识库 → 代理地址」配置代理（部署 <code>cloudflare-worker.js</code>，含 <code>/chat</code> 和 <code>/dingtalk</code> 两个端点）。<br>webhook 地址与加签密钥在钉钉群「群设置 → 智能群助手 → 添加机器人 → 自定义」中获取。</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
       <input class="inp" id="ding_webhook" placeholder="webhook 地址（https://oapi.dingtalk.com/robot/send?access_token=...）" value="${(getDingCfg().webhook||'')}" style="flex:2;min-width:280px">
       <input class="inp" id="ding_secret" placeholder="加签密钥（可选，机器人「加签」开启时填）" value="${(getDingCfg().secret||'')}" style="flex:1;min-width:180px">
