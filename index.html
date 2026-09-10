@@ -2020,7 +2020,11 @@ async function dingPush(title, text){
     const payload={msgtype:'markdown', markdown:{title:title, text:text}};
     const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const j=await res.json().catch(()=>({}));
-    if(j.errcode && j.errcode!==0) return {err:'钉钉返回错误：'+(j.errmsg||('errcode '+j.errcode))};
+    if(j.errcode && j.errcode!==0){
+      if(j.errcode===310000) return {err:'机器人已开启「加签」安全设置，请在下方「钉钉推送配置」填写加签密钥（SEC 开头的字符串）'};
+      if(j.errcode===300001 || j.errcode===310000) return {err:'推送被拒：'+(j.errmsg||('errcode '+j.errcode))};
+      return {err:'钉钉返回错误：'+(j.errmsg||('errcode '+j.errcode))};
+    }
     return {ok:true};
   }catch(e){ return {err:'推送失败：'+String(e)}; }
 }
