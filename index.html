@@ -1932,23 +1932,34 @@ async function aiAnalyzeScene(){
     const file=fileInput.files[0];
     const base64=await compressImage(file);
     const st=getTargetStore('scene');
-    let prompt='请识别这张【直播间场景截图】，严格按下面顺序输出两部分：先输出第一部分（JSON），再输出第二部分（简要文字）。\n';
+    // 店铺上下文（两次调用共用）
+    let shopCtx='';
     if(st){
       const s=DATA.store_series[st];
       const periods=Object.keys(s.months||{}).sort();
       const cur=periods.length?s.months[periods[periods.length-1]]:null;
-      prompt+='\n【店铺】'+st+'（'+s.cat+' · '+s.country+' · '+s.manager+'）';
+      shopCtx+='\n\n【店铺】'+st+'（'+s.cat+' · '+s.country+' · '+s.manager+'）';
       if(cur){
-        prompt+='\n【最新期指标】'+JSON.stringify({gmv:Math.round(cur.gmv), 场均GMV:Math.round(cur.avg_gmv), PCR:cur.pcr+'%', CTR:cur.ctr+'%', 观看秒:Math.round(cur.watch), 新关注:cur.follow, 健康度:cur.score});
+        shopCtx+='\n【最新期指标】'+JSON.stringify({gmv:Math.round(cur.gmv), 场均GMV:Math.round(cur.avg_gmv), PCR:cur.pcr+'%', CTR:cur.ctr+'%', 观看秒:Math.round(cur.watch), 新关注:cur.follow, 健康度:cur.score});
       }
-      prompt+='\n【大盘达标线(中位数)】'+JSON.stringify(benchSummary());
-      const ctx=catCtx(s.cat); if(ctx) prompt+=ctx;
+      shopCtx+='\n【大盘达标线(中位数)】'+JSON.stringify(benchSummary());
+      const c=catCtx(s.cat); if(c) shopCtx+=c;
     }
-    prompt+='\n\n【第一部分·图上标注+优化草图（这是必须输出的核心结果，严格用三个反引号 json 包裹，只输出一个 json 块，不要输出其它代码块）】\n```json\n{"marks":[{"n":1,"label":"灯光","x":15,"y":10,"w":40,"h":20,"issue":"顶光偏暗","fix":"加2盏环形补光灯"},{"n":2,"label":"产品陈列","x":55,"y":30,"w":35,"h":40,"issue":"产品零散","fix":"主推品前置居中"}],"sketch":{"title":"优化后直播间布局草图","zones":["主播居中偏左","主推产品右侧前景陈列","背景墙放品牌logo+活动贴片","左右45度各一盏补光灯","前景桌面放引流款+价格牌"]}}\n```\n要求：marks 给 3-5 个画面中最需要调整的区域（x/y/w/h 为图片宽高百分比 0-100，每个 issue/fix 不超过 20 字）；sketch.zones 给 5 条优化后布局要点。\n\n【第二部分·文字诊断（简要，总字数控制在 300 字以内，每条一句话，禁止长篇展开）】从灯光布光、背景氛围、产品陈列、画面构图、主播/产品位置、贴片文字、色彩清晰度 7 个维度中，只挑最关键的 3-5 个问题，每个问题一句话点出 + 一句优化建议。';
-    const r=await callDeepSeekVision(prompt, base64);
+    // —— 调用1：详细文字诊断（7 维逐项详细分析，质量不降）——
+    out.innerHTML='<span class="typing">▍ DeepSeek 正在逐维度分析画面…</span>';
+    const prompt1='请对这张直播间场景截图做详细诊断，从「灯光布光、背景氛围、产品陈列、画面布局与构图、主播/产品位置、画面贴片与文字、色彩与清晰度」7 个维度，逐项详细分析当前存在的问题，并给出可落地的优化建议。每个维度都要给出：①当前具体问题 ②为什么影响转化 ③具体优化动作（贴合该品类）④预期效果。'+shopCtx;
+    const r1=await callDeepSeekVision(prompt1, base64);
+    if(r1.err){ out.innerHTML=`<div class="callout amber"><b>识别失败</b>${r1.err}</div>`; return; }
+    // —— 调用2：图上标注 + 优化草图（独立调用，专门输出 JSON，稳定不丢）——
+    out.innerHTML='<span class="typing">▍ 正在生成图上标注与优化草图…</span>';
+    const prompt2='请识别这张直播间场景截图，输出「图上标注 + 优化草图」数据，严格用三个反引号 json 包裹（只输出这一个 json 块，不要输出任何其它内容）。格式：\n```json\n{"marks":[{"n":1,"label":"灯光","x":15,"y":10,"w":40,"h":20,"issue":"顶光偏暗","fix":"加2盏环形补光灯"},{"n":2,"label":"产品陈列","x":55,"y":30,"w":35,"h":40,"issue":"产品零散","fix":"主推品前置居中"}],"sketch":{"title":"优化后直播间布局草图","zones":["主播居中偏左","主推产品右侧前景陈列","背景墙放品牌logo+活动贴片","左右45度各一盏补光灯","前景桌面放引流款+价格牌"]}}\n```\n要求：marks 给 3-5 个画面中最需要调整的区域（x/y/w/h 为图片宽高百分比 0-100，每个 issue/fix 不超过 20 字）；sketch.zones 给 5 条优化后布局要点。';
+    const r2=await callDeepSeekVision(prompt2, base64);
+    // 合并：文字诊断 + JSON 标注（若标注调用失败，仍保留文字诊断）
+    const fullText = (r2 && r2.text) ? (r1.text + '\n\n' + r2.text) : r1.text;
     const sizeInfo=`<span style="color:var(--dim)">（原图 ${Math.round(file.size/1024)}KB → 处理后约 ${Math.round(base64.length*3/4/1024)}KB）</span>`;
-    if(r.err){ out.innerHTML=`<div class="callout amber"><b>识别失败</b>${r.err}<br>${sizeInfo}</div>`; }
-    else{ const rep=renderSceneReport(base64, r.text, sizeInfo); out.innerHTML=rep.display; window._export={title:'直播间场景诊断_'+new Date().toISOString().slice(0,10), md:'# 直播间场景诊断\n\n'+r.text, html:rep.content}; }
+    const rep=renderSceneReport(base64, fullText, sizeInfo);
+    out.innerHTML=rep.display;
+    window._export={title:'直播间场景诊断_'+new Date().toISOString().slice(0,10), md:'# 直播间场景诊断\n\n'+fullText, html:rep.content};
   }catch(e){ out.innerHTML='<div class="callout amber"><b>图片处理失败</b>'+String(e)+'</div>'; }
 }
 
