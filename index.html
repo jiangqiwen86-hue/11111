@@ -1509,7 +1509,8 @@ function setProxyToken(v){ if(v) localStorage.setItem('liveops_proxy_token',v); 
 function setDirectKey(v){ if(v) localStorage.setItem('liveops_ds_key',v.replace(/[^\x00-\xFF]/g,'').trim()); else localStorage.removeItem('liveops_ds_key'); }
 function aiConfigured(){ return !!(proxyUrl() || directKey()); }
 
-async function callDeepSeek(prompt){
+async function callDeepSeek(prompt, maxTokens){
+  maxTokens = maxTokens || 2500;
   const messages = [{role:'system',content:DS_SYSTEM},{role:'user',content:prompt}];
   const pUrl = proxyUrl();
   // ---- 模式1：服务端代理（推荐，Key 不暴露）----
@@ -1520,7 +1521,7 @@ async function callDeepSeek(prompt){
       if(t) headers['X-Auth-Token'] = t;
       const res = await fetch(pUrl.replace(/\/+$/,'') + '/chat', {
         method:'POST', headers,
-        body: JSON.stringify({messages, temperature:0.7, max_tokens:2500})
+        body: JSON.stringify({messages, temperature:0.7, max_tokens:maxTokens})
       });
       const j = await res.json();
       if(j.error) return {err:(j.error.message||'代理返回错误') + (res.status?` (HTTP ${res.status})`:'')};
@@ -1534,7 +1535,7 @@ async function callDeepSeek(prompt){
   try{
     const res=await fetch('https://api.deepseek.com/chat/completions',{method:'POST',
       headers:{'Content-Type':'application/json; charset=utf-8','Authorization':'Bearer '+key},
-      body:JSON.stringify({model:'deepseek-chat',messages,temperature:0.7,max_tokens:2500})});
+      body:JSON.stringify({model:'deepseek-chat',messages,temperature:0.7,max_tokens:maxTokens})});
     const j=await res.json();
     if(j.error) return {err:(j.error.message||'API错误') + (j.error.code?` (code: ${j.error.code})`:'')};
     return {text:j.choices?.[0]?.message?.content||'(空响应)'};
@@ -1772,9 +1773,9 @@ async function aiAsk(){
   else { prompt+='\n\n【提示】当前未识别到具体店铺/品类。若问题涉及具体直播间，请先推断或反问用户店铺/品类，再按该品类打法给出针对性方案，禁止给跨品类通用的空话。'; }
   // 6) 命中店铺时要求输出行动项
   if(targetStore){
-    prompt+='\n\n最后，请额外输出一段【行动项】数据，严格用三个反引号 json 包裹（放在文字诊断之后），把 Top 优化方案拆成可执行行动项，格式：\n\`\`\`json\n{"actions":[{"title":"优化开场3秒钩子","detail":"开场用痛点/悬念替代产品直铺","priority":"P0","expected":"观看时长从20秒提升到40秒","due":"本周内"}]}\n\`\`\`\nactions 给 2-4 条即可，priority 取 P0/P1/P2。';
+    prompt+='\n\n【行动项·硬性要求】请在回答结束后，务必输出一段 JSON 行动项数据（不要用 markdown 标题代替，必须是 JSON），严格用三个反引号 json 包裹，格式如下：\n\`\`\`json\n{"actions":[{"title":"优化开场3秒钩子","detail":"开场用痛点/悬念替代产品直铺","priority":"P0","expected":"观看时长从20秒提升到40秒","due":"本周内"}]}\n\`\`\`\n把 Top 优化方案拆成 2-4 条行动项，每条 priority 取 P0/P1/P2。';
   }
-  const r=await callDeepSeek(prompt);
+  const r=await callDeepSeek(prompt, 4000);
   if(r.err){ out.innerHTML=`<div class="callout amber"><b>AI 调用失败</b>${r.err}<br>${aiConfigured()?'':'请先在「DeepSeek 大模型配置」里填写代理地址（推荐）或直连 Key。'}</div>`; }
   else{
     let actionNote='';
@@ -1790,9 +1791,9 @@ async function aiAnalyzeStore(){
   if(!window._revSeries){ return; }
   if(!perm().ai){ alert('当前账号无 AI 分析权限'); return; }
   const s=window._revSeries; const cur=s.months[Object.keys(s.months).sort().pop()];
-  let prompt=`请对这家直播间做深度诊断：${JSON.stringify({店铺:s.store,国家:s.country,品类:s.cat,最新期数据:cur,周期数据:s.months,大盘基准:DATA.benchmark}).slice(0,4000)}\n【全公司大盘达标线(中位数)】${JSON.stringify(benchSummary())}\n请逐指标对比达标线，明确输出：1)哪些指标异常、当前具体数值、与达标线差距多少 2)核心问题定位 3)漏斗卡点 4)分优先级(P0/P1/P2)的优化方案（带具体动作、话术、预期指标）。\n\n最后，请额外输出一段【行动项】数据，严格用三个反引号 json 包裹（放在文字诊断之后），把 Top 优化方案拆成可执行行动项，格式：\n\`\`\`json\n{"actions":[{"title":"优化开场3秒钩子","detail":"开场用痛点/悬念替代产品直铺","priority":"P0","expected":"观看时长从20秒提升到40秒","due":"本周内"}]}\n\`\`\`\nactions 给 2-4 条即可，priority 取 P0/P1/P2。`;
+  let prompt=`请对这家直播间做深度诊断：${JSON.stringify({店铺:s.store,国家:s.country,品类:s.cat,最新期数据:cur,周期数据:s.months,大盘基准:DATA.benchmark}).slice(0,4000)}\n【全公司大盘达标线(中位数)】${JSON.stringify(benchSummary())}\n请逐指标对比达标线，明确输出：1)哪些指标异常、当前具体数值、与达标线差距多少 2)核心问题定位 3)漏斗卡点 4)分优先级(P0/P1/P2)的优化方案（带具体动作、话术、预期指标）。\n\n【行动项·硬性要求】请在文字诊断结束后，务必输出一段 JSON 行动项数据（不要用 markdown 标题代替，必须是 JSON），严格用三个反引号 json 包裹，格式如下：\n\`\`\`json\n{"actions":[{"title":"优化开场3秒钩子","detail":"开场用痛点/悬念替代产品直铺","priority":"P0","expected":"观看时长从20秒提升到40秒","due":"本周内"}]}\n\`\`\`\n把 Top 优化方案拆成 2-4 条行动项，每条的 priority 取 P0/P1/P2。`;
   const ctx=catCtx(s.cat); if(ctx){ prompt+=ctx; }
-  const r=await callDeepSeek(prompt);
+  const r=await callDeepSeek(prompt, 4000);
   let actionNote='';
   if(!r.err){
     const acts=parseActionsFromText(r.text);
@@ -1977,9 +1978,18 @@ function storeOwnerUsername(store){ const u=USERS.find(x=>x.role==='store' && x.
 // —— 从 AI 文本宽容解析行动项 ——
 function parseActionsFromText(text){
   if(!text) return [];
-  const m=text.match(/```(?:json|JSON)?\s*([\s\S]*?)```/);
-  if(!m) return [];
-  try{ const obj=JSON.parse(m[1].trim()); if(obj && Array.isArray(obj.actions)) return obj.actions.filter(a=>a && (a.title||a.action)); }catch(e){}
+  // 遍历所有 ``` 代码块，找能 JSON.parse 出 actions 的那个（AI 可能在文字里画漏斗图等其它代码块）
+  const blocks=text.match(/```[\s\S]*?```/g)||[];
+  for(const block of blocks){
+    const inner=block.replace(/^```(?:json|JSON)?\s*/,'').replace(/```\s*$/,'');
+    try{
+      const obj=JSON.parse(inner.trim());
+      if(obj && Array.isArray(obj.actions)) return obj.actions.filter(a=>a && (a.title||a.action));
+    }catch(e){}
+  }
+  // 兜底：全文提取 {"actions":[...]} 对象
+  const m=text.match(/\{\s*"actions"\s*:\s*\[[\s\S]*?\]\s*\}/);
+  if(m){ try{ const obj=JSON.parse(m[0]); if(obj && Array.isArray(obj.actions)) return obj.actions.filter(a=>a && (a.title||a.action)); }catch(e){} }
   return [];
 }
 // —— 行动项落库（诊断后调用）——
