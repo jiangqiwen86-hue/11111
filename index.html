@@ -1948,20 +1948,15 @@ async function aiOptimizeScript(){
 
 // ================= 视图7：账号管理（admin） =================
 function getUsers(){
-  let users=null;
-  try{ users=JSON.parse(localStorage.getItem('liveops_users')||'null'); }catch(e){ users=null; }
-  if(!Array.isArray(users)||!users.length) return USERS;
-  // 修复旧数据：非 admin 账号缺 store 绑定时，从内置 USERS 补
-  let dirty=false;
-  users=users.map(u=>{
-    if(u && u.role!=='admin' && !u.store){
-      const builtin=USERS.find(x=>x.username===u.username || x.id===u.id || x.name===u.name);
-      if(builtin && builtin.store){ dirty=true; return Object.assign({},u,{store:builtin.store}); }
-    }
-    return u;
-  });
-  if(dirty){ try{ localStorage.setItem('liveops_users',JSON.stringify(users)); }catch(e){} }
-  return users;
+  let extra=[];
+  try{ extra=JSON.parse(localStorage.getItem('liveops_users')||'[]'); }catch(e){ extra=[]; }
+  if(!Array.isArray(extra)) extra=[];
+  // 内置账号（总负责人 + 店长）始终以 USERS 常量为准，保证账号/密码/店铺绑定最新、登录可靠；
+  // localStorage 仅保留「非内置」的额外账号（admin 手动新增 / 审核通过的注册），避免旧数据覆盖内置账号导致登录失败
+  const builtinNames = new Set(USERS.map(u=>u.username));
+  const builtinIds = new Set(USERS.map(u=>u.id));
+  const extraOnly = extra.filter(u=>u && !builtinNames.has(u.username) && !builtinIds.has(u.id));
+  return USERS.concat(extraOnly);
 }
 function saveUsers(u){ localStorage.setItem('liveops_users',JSON.stringify(u)); }
 function viewAccount(){
@@ -2039,8 +2034,14 @@ function addUser(){
   users.push({id:'u_'+Date.now(),username:username,name:name,role:role,store:store,title:(ROLE_LABEL[role]||'店长')+'·'+store,pwdHash:sha256('123456')});
   saveUsers(users); viewAccount(); alert('已添加，初始密码 123456');
 }
-function delUser(id){ const users=getUsers().filter(u=>u.id!==id); saveUsers(users); viewAccount(); }
+function delUser(id){
+  const builtin=USERS.find(x=>x.id===id);
+  if(builtin){ alert('内置账号（'+builtin.name+'）由系统统一管理，不可在此删除'); return; }
+  const users=getUsers().filter(u=>u.id!==id); saveUsers(users); viewAccount();
+}
 function resetPwd(id){
+  const builtin=USERS.find(x=>x.id===id);
+  if(builtin){ alert('内置账号（'+builtin.name+'）密码由系统统一管理，不可在此修改'); return; }
   const np=prompt('输入新密码（至少6位）：');
   if(!np||np.length<6){ alert('密码至少6位'); return; }
   const users=getUsers(); const u=users.find(x=>x.id===id); if(u){ u.pwdHash=sha256(np); saveUsers(users); alert('已重置'); }
