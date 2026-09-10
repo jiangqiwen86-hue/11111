@@ -505,6 +505,7 @@ const NAV=[
     {id:'dashboard', ic:'📊', txt:'数据看板'},
     {id:'review', ic:'🔍', txt:'直播复盘'},
     {id:'bench', ic:'🏆', txt:'标杆/问题盘点'},
+    {id:'actions', ic:'✅', txt:'行动项跟踪'},
   ]},
   {group:'工具', items:[
     {id:'weekly', ic:'📅', txt:'周维度诊断', storeHide:true},
@@ -544,7 +545,7 @@ function switchView(id){
   const n=document.getElementById('nav_'+id); if(n) n.classList.add('active');
   const mc=document.getElementById('mainContent');
   mc.innerHTML='';
-  const V={dashboard:viewDashboard, review:viewReview, bench:viewBench, weekly:viewWeekly, standard:viewStandard, ai:viewAI, account:viewAccount};
+  const V={dashboard:viewDashboard, review:viewReview, bench:viewBench, actions:viewActions, weekly:viewWeekly, standard:viewStandard, ai:viewAI, account:viewAccount};
   (V[id]||viewDashboard)();
 }
 
@@ -1769,19 +1770,38 @@ async function aiAsk(){
   const ctx=catCtx(cat);
   if(ctx){ prompt+=ctx; }
   else { prompt+='\n\n【提示】当前未识别到具体店铺/品类。若问题涉及具体直播间，请先推断或反问用户店铺/品类，再按该品类打法给出针对性方案，禁止给跨品类通用的空话。'; }
+  // 6) 命中店铺时要求输出行动项
+  if(targetStore){
+    prompt+='\n\n最后，请额外输出一段【行动项】数据，严格用三个反引号 json 包裹（放在文字诊断之后），把 Top 优化方案拆成可执行行动项，格式：\n\`\`\`json\n{"actions":[{"title":"优化开场3秒钩子","detail":"开场用痛点/悬念替代产品直铺","priority":"P0","expected":"观看时长从20秒提升到40秒","due":"本周内"}]}\n\`\`\`\nactions 给 2-4 条即可，priority 取 P0/P1/P2。';
+  }
   const r=await callDeepSeek(prompt);
   if(r.err){ out.innerHTML=`<div class="callout amber"><b>AI 调用失败</b>${r.err}<br>${aiConfigured()?'':'请先在「DeepSeek 大模型配置」里填写代理地址（推荐）或直连 Key。'}</div>`; }
-  else{ out.innerHTML=`<div style="line-height:1.8;font-size:14px">${mdToHtml(r.text)}</div>`; window._export={ title:'AI分析结论_'+new Date().toISOString().slice(0,10), md:'# AI 分析结论\n\n**问题**：'+q+'\n\n**生成时间**：'+new Date().toLocaleString('zh-CN')+'\n\n'+r.text }; }
+  else{
+    let actionNote='';
+    if(targetStore){
+      const acts=parseActionsFromText(r.text);
+      if(acts.length){ const n=commitActions(targetStore, acts, 'AI问答'); actionNote=`<div class="callout" style="margin-top:10px">✅ 已自动生成 <b>${n}</b> 条行动项，可在左侧「✅ 行动项跟踪」查看并跟踪完成。</div>`; }
+    }
+    out.innerHTML=`<div style="line-height:1.8;font-size:14px">${mdToHtml(r.text)}</div>${actionNote}`; window._export={ title:'AI分析结论_'+new Date().toISOString().slice(0,10), md:'# AI 分析结论\n\n**问题**：'+q+'\n\n**生成时间**：'+new Date().toLocaleString('zh-CN')+'\n\n'+r.text };
+  }
 }
 async function aiAnalyzeStore(){
   const out=document.getElementById('reviewResult');
   if(!window._revSeries){ return; }
   if(!perm().ai){ alert('当前账号无 AI 分析权限'); return; }
   const s=window._revSeries; const cur=s.months[Object.keys(s.months).sort().pop()];
-  let prompt=`请对这家直播间做深度诊断：${JSON.stringify({店铺:s.store,国家:s.country,品类:s.cat,最新期数据:cur,周期数据:s.months,大盘基准:DATA.benchmark}).slice(0,4000)}\n【全公司大盘达标线(中位数)】${JSON.stringify(benchSummary())}\n请逐指标对比达标线，明确输出：1)哪些指标异常、当前具体数值、与达标线差距多少 2)核心问题定位 3)漏斗卡点 4)分优先级(P0/P1/P2)的优化方案（带具体动作、话术、预期指标）。`;
+  let prompt=`请对这家直播间做深度诊断：${JSON.stringify({店铺:s.store,国家:s.country,品类:s.cat,最新期数据:cur,周期数据:s.months,大盘基准:DATA.benchmark}).slice(0,4000)}\n【全公司大盘达标线(中位数)】${JSON.stringify(benchSummary())}\n请逐指标对比达标线，明确输出：1)哪些指标异常、当前具体数值、与达标线差距多少 2)核心问题定位 3)漏斗卡点 4)分优先级(P0/P1/P2)的优化方案（带具体动作、话术、预期指标）。\n\n最后，请额外输出一段【行动项】数据，严格用三个反引号 json 包裹（放在文字诊断之后），把 Top 优化方案拆成可执行行动项，格式：\n\`\`\`json\n{"actions":[{"title":"优化开场3秒钩子","detail":"开场用痛点/悬念替代产品直铺","priority":"P0","expected":"观看时长从20秒提升到40秒","due":"本周内"}]}\n\`\`\`\nactions 给 2-4 条即可，priority 取 P0/P1/P2。`;
   const ctx=catCtx(s.cat); if(ctx){ prompt+=ctx; }
   const r=await callDeepSeek(prompt);
-  const box=document.createElement('div'); box.className='card'; box.innerHTML='<h3><span class="dot"></span>🤖 AI 深度分析报告</h3><div class="ai-out" style="margin-top:8px;line-height:1.8;font-size:14px">'+(r.err?('<div class="callout amber"><b>调用失败</b>'+r.err+'</div>'):mdToHtml(r.text))+'</div>';
+  let actionNote='';
+  if(!r.err){
+    const acts=parseActionsFromText(r.text);
+    if(acts.length){
+      const n=commitActions(s.store, acts, '单店AI诊断');
+      actionNote=`<div class="callout" style="margin-top:10px">✅ 已自动生成 <b>${n}</b> 条行动项，可在左侧「✅ 行动项跟踪」查看并跟踪完成。</div>`;
+    }
+  }
+  const box=document.createElement('div'); box.className='card'; box.innerHTML='<h3><span class="dot"></span>🤖 AI 深度分析报告</h3><div class="ai-out" style="margin-top:8px;line-height:1.8;font-size:14px">'+(r.err?('<div class="callout amber"><b>调用失败</b>'+r.err+'</div>'):mdToHtml(r.text))+actionNote+'</div>';
   out.appendChild(box); box.scrollIntoView({behavior:'smooth'});
 }
 
@@ -1944,6 +1964,174 @@ async function aiOptimizeScript(){
     out.innerHTML=`<div style="display:flex;gap:8px;margin:4px 0 10px"><button class="btn" style="padding:6px 12px" onclick="exportConclusion()">📥 导出结论</button><button class="btn ghost" style="padding:6px 12px" onclick="exportConclusionHtml()">导出报告(HTML)</button></div><div style="line-height:1.8;font-size:14px">${mdToHtml(r.text)}</div>`;
     window._export={title:'直播话术优化_'+new Date().toISOString().slice(0,10), md:'# 直播话术优化\n\n'+r.text};
   }
+}
+
+// ================= 视图8：行动项跟踪 =================
+// —— 数据层（localStorage 持久化）——
+function getActions(){ try{ const a=JSON.parse(localStorage.getItem('liveops_actions')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function saveActions(a){ localStorage.setItem('liveops_actions', JSON.stringify(a)); }
+function getDingCfg(){ try{ const c=JSON.parse(localStorage.getItem('liveops_ding')||'null'); return c||{webhook:'',secret:''}; }catch(e){ return {webhook:'',secret:''}; } }
+function saveDingCfg(c){ localStorage.setItem('liveops_ding', JSON.stringify(c)); }
+// 从店铺名反查店长登录账号（owner）
+function storeOwnerUsername(store){ const u=USERS.find(x=>x.role==='store' && x.store===store); return u?u.username:''; }
+// —— 从 AI 文本宽容解析行动项 ——
+function parseActionsFromText(text){
+  if(!text) return [];
+  const m=text.match(/```(?:json|JSON)?\s*([\s\S]*?)```/);
+  if(!m) return [];
+  try{ const obj=JSON.parse(m[1].trim()); if(obj && Array.isArray(obj.actions)) return obj.actions.filter(a=>a && (a.title||a.action)); }catch(e){}
+  return [];
+}
+// —— 行动项落库（诊断后调用）——
+function commitActions(store, rawActions, source){
+  if(!Array.isArray(rawActions)||!rawActions.length) return 0;
+  const now=Date.now(); const all=getActions(); let added=0;
+  rawActions.forEach((a,i)=>{
+    const act={
+      id:'a_'+now+'_'+i, store:store||'', owner:storeOwnerUsername(store)||'',
+      title:a.title||a.action||'未命名行动项', detail:a.detail||a.fix||'',
+      priority:String(a.priority||a.level||'P1').toUpperCase().replace(/[^P0-9]/g,'').slice(0,2)||'P1',
+      expected:a.expected||a.metric||'', due:a.due||a.deadline||'',
+      status:'pending', source:source||'AI诊断', created:new Date().toLocaleString('zh-CN'), createdTs:now
+    };
+    all.unshift(act); added++;
+  });
+  saveActions(all); return added;
+}
+// —— 钉钉加签（HMAC-SHA256 + base64 + URL编码）——
+async function dingSign(secret){
+  const timestamp=Date.now(); const stringToSign=timestamp+'\n'+secret;
+  const enc=new TextEncoder();
+  const key=await crypto.subtle.importKey('raw', enc.encode(secret), {name:'HMAC',hash:'SHA-256'}, false, ['sign']);
+  const sig=await crypto.subtle.sign('HMAC', key, enc.encode(stringToSign));
+  const base64=btoa(String.fromCharCode(...new Uint8Array(sig)));
+  return {timestamp, sign:encodeURIComponent(base64)};
+}
+// —— 钉钉推送（markdown 卡片）——
+async function dingPush(title, text){
+  const cfg=getDingCfg();
+  if(!cfg.webhook || !cfg.webhook.trim()) return {err:'未配置钉钉机器人 webhook 地址（请在下方「钉钉推送配置」填写）'};
+  try{
+    let url=cfg.webhook.trim();
+    if(cfg.secret && cfg.secret.trim()){
+      const s=await dingSign(cfg.secret.trim());
+      url+=(url.indexOf('?')>=0?'&':'?')+'timestamp='+s.timestamp+'&sign='+s.sign;
+    }
+    const payload={msgtype:'markdown', markdown:{title:title, text:text}};
+    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const j=await res.json().catch(()=>({}));
+    if(j.errcode && j.errcode!==0) return {err:'钉钉返回错误：'+(j.errmsg||('errcode '+j.errcode))};
+    return {ok:true};
+  }catch(e){ return {err:'推送失败：'+String(e)}; }
+}
+// 组装单条行动项的钉钉 markdown
+function actionMd(a){
+  const prio={'P0':'🔴 P0 紧急','P1':'🟠 P1 重要','P2':'🔵 P2 一般'}[a.priority]||a.priority;
+  return '**'+prio+'｜'+a.title+'**\n'+
+    (a.store?'> 店铺：'+a.store+'\n':'')+
+    (a.owner?'> 责任人：'+a.owner+'\n':'')+
+    (a.detail?'> 动作：'+a.detail+'\n':'')+
+    (a.expected?'> 预期指标：'+a.expected+'\n':'')+
+    (a.due?'> 截止：'+a.due+'\n':'');
+}
+// 推送到钉钉（admin 批量推送未完成项）
+async function pushActionsToDing(){
+  const acts=getActions().filter(a=>a.status!=='done');
+  if(!acts.length){ alert('暂无待推送的行动项'); return; }
+  const txt='### 📋 直播复盘行动项提醒\n\n'+acts.map((a,i)=>(i+1)+'. '+actionMd(a)).join('\n');
+  const r=await dingPush('直播复盘行动项提醒', txt);
+  if(r.err) alert(r.err); else alert('已推送到钉钉（'+acts.length+' 条）');
+}
+// —— 行动项状态更新 ——
+function setActionStatus(id, status){
+  const all=getActions(); const a=all.find(x=>x.id===id);
+  if(a){ a.status=status; if(status==='done') a.doneAt=new Date().toLocaleString('zh-CN'); saveActions(all); }
+  viewActions();
+}
+function delAction(id){ saveActions(getActions().filter(x=>x.id!==id)); viewActions(); }
+function addActionManual(){
+  const title=(document.getElementById('act_title')||{}).value||'';
+  const detail=(document.getElementById('act_detail')||{}).value||'';
+  const priority=(document.getElementById('act_priority')||{}).value||'P1';
+  const expected=(document.getElementById('act_expected')||{}).value||'';
+  const due=(document.getElementById('act_due')||{}).value||'';
+  const store=session.role==='admin' ? ((document.getElementById('act_store')||{}).value||'') : myStore();
+  if(!title){ alert('请填写行动项标题'); return; }
+  commitActions(store, [{title:title,detail:detail,priority:priority,expected:expected,due:due}], '手动新增');
+  viewActions();
+}
+// —— 视图渲染 ——
+function viewActions(){
+  const mc=document.getElementById('mainContent');
+  const isAdmin=session.role==='admin';
+  let acts=getActions();
+  if(!isAdmin){ const st=myStore(); acts=acts.filter(a=>a.store===st || a.owner===session.username); }
+  const pending=acts.filter(a=>a.status==='pending').length;
+  const doing=acts.filter(a=>a.status==='doing').length;
+  const done=acts.filter(a=>a.status==='done').length;
+  const prioCls={'P0':'b-red','P1':'b-amber','P2':'b-dim'};
+  const stCls={'pending':'b-amber','doing':'b-cyan','done':'b-green'};
+  const stTxt={'pending':'待办','doing':'进行中','done':'已完成'};
+  const row=a=>`
+    <div class="kb-card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+            <span class="badge ${prioCls[a.priority]||'b-dim'}">${a.priority||'P1'}</span>
+            <span class="badge ${stCls[a.status]||'b-dim'}">${stTxt[a.status]||a.status}</span>
+            <b style="font-size:14px">${a.title||''}</b>
+          </div>
+          ${a.store?`<div class="hint" style="margin:2px 0">店铺：${a.store}${a.owner?(' · 责任人：'+a.owner):''}</div>`:''}
+          ${a.detail?`<div style="font-size:13px;margin:4px 0">${a.detail}</div>`:''}
+          ${a.expected?`<div class="hint" style="margin:2px 0">🎯 预期：${a.expected}</div>`:''}
+          <div class="hint" style="margin-top:4px">来源：${a.source||'—'} · ${a.created||''}${a.due?(' · 截止 '+a.due):''}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+          ${a.status!=='done'?`<button class="btn" style="padding:5px 12px;font-size:12px" onclick="setActionStatus('${a.id}','done')">✅ 完成</button>`:''}
+          ${a.status==='pending'?`<button class="btn ghost" style="padding:5px 12px;font-size:12px" onclick="setActionStatus('${a.id}','doing')">▶ 进行中</button>`:''}
+          <button class="btn ghost" style="padding:5px 12px;font-size:12px;color:var(--red)" onclick="delAction('${a.id}')">删除</button>
+        </div>
+      </div>
+    </div>`;
+  const storeOpts=(isAdmin?`<option value="">— 选择店铺 —</option>`:'')+STORES.map(s=>`<option value="${s.store}">${s.store}</option>`).join('');
+  mc.innerHTML=`
+  <div class="h-title">✅ 行动项跟踪 <span class="tag">执行闭环</span></div>
+  <div class="h-sub">诊断不是终点——把每条结论落成「责任人 + 动作 + 预期指标」，跟踪到完成，下次复盘对照改善${isAdmin?'':'（仅显示本店行动项）'}</div>
+  <div class="grid g3" style="margin-bottom:14px">
+    <div class="card" style="text-align:center"><div style="font-size:30px;font-weight:700;color:var(--orange)">${pending}</div><div class="hint">待办</div></div>
+    <div class="card" style="text-align:center"><div style="font-size:30px;font-weight:700;color:var(--cyan)">${doing}</div><div class="hint">进行中</div></div>
+    <div class="card" style="text-align:center"><div style="font-size:30px;font-weight:700;color:var(--green)">${done}</div><div class="hint">已完成</div></div>
+  </div>
+  ${isAdmin?`
+  <div class="card" style="margin-bottom:14px">
+    <h3><span class="dot"></span>钉钉推送配置</h3>
+    <div class="desc">配置后，可一键把未完成的行动项推送到钉钉群（群机器人 webhook）。webhook 地址与加签密钥在钉钉群「群设置 → 智能群助手 → 添加机器人 → 自定义」中获取。</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <input class="inp" id="ding_webhook" placeholder="webhook 地址（https://oapi.dingtalk.com/robot/send?access_token=...）" value="${(getDingCfg().webhook||'')}" style="flex:2;min-width:280px">
+      <input class="inp" id="ding_secret" placeholder="加签密钥（可选，机器人「加签」开启时填）" value="${(getDingCfg().secret||'')}" style="flex:1;min-width:180px">
+    </div>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn ghost" onclick="saveDingCfg({webhook:document.getElementById('ding_webhook').value.trim(),secret:document.getElementById('ding_secret').value.trim()});alert('钉钉配置已保存')">💾 保存配置</button>
+      <button class="btn" onclick="pushActionsToDing()">📤 推送未完成行动项到钉钉</button>
+    </div>
+  </div>`:''}
+  <div class="card" style="margin-bottom:14px">
+    <h3><span class="dot"></span>新增行动项</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      ${isAdmin?`<select class="sel" id="act_store" style="flex:1;min-width:150px">${storeOpts}</select>`:''}
+      <select class="sel" id="act_priority" style="min-width:90px"><option value="P0">P0 紧急</option><option value="P1" selected>P1 重要</option><option value="P2">P2 一般</option></select>
+      <input class="inp" id="act_title" placeholder="行动项标题（做什么）" style="flex:2;min-width:200px">
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <input class="inp" id="act_detail" placeholder="具体动作（怎么做）" style="flex:2;min-width:200px">
+      <input class="inp" id="act_expected" placeholder="预期指标（做到多少）" style="flex:2;min-width:180px">
+      <input class="inp" id="act_due" placeholder="截止日期" style="min-width:120px">
+    </div>
+    <div class="btn-row" style="margin-top:10px"><button class="btn" onclick="addActionManual()">➕ 新增</button></div>
+  </div>
+  <div class="card"><h3><span class="dot"></span>行动项列表（${acts.length}）</h3>
+    ${acts.length?acts.map(row).join(''):'<div class="hint" style="padding:20px 0">暂无行动项。可在「直播复盘」做 AI 诊断后自动生成，或手动新增。</div>'}
+  </div>`;
 }
 
 // ================= 视图7：账号管理（admin） =================
