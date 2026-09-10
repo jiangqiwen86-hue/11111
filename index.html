@@ -2008,7 +2008,41 @@ function commitActions(store, rawActions, source){
   });
   saveActions(all); return added;
 }
-// —— 钉钉推送（必须走代理，钉钉 webhook 不支持 CORS，浏览器直连会被拒）——
+// —— 问题申诉（店长对诊断/行动项发起申诉，总负责人审批）——
+const APPEAL_REASONS=['新品/换季空窗期','大促前后蓄水或透支','店铺/仓库搬迁、物流异常','平台活动或政策变化','主播/团队人员变动','库存/断货','数据口径或统计异常','其他（请补充说明）'];
+function appealAction(id){
+  const all=getActions(); const a=all.find(x=>x.id===id);
+  if(!a) return;
+  if(a.status==='appeal'){ alert('该行动项已在申诉中，请等待总负责人处理'); return; }
+  const menu=APPEAL_REASONS.map((r,i)=>(i+1)+'. '+r).join('\n');
+  const choice=prompt('请选择申诉原因（输入编号）：\n\n'+menu);
+  if(!choice) return;
+  const idx=parseInt(choice,10)-1;
+  if(isNaN(idx)||idx<0||idx>=APPEAL_REASONS.length){ alert('编号无效'); return; }
+  const note=prompt('补充说明（可选，说明特殊情况对数据的影响，便于总负责人判断）：')||'';
+  a.status='appeal';
+  a.appeal={reason:APPEAL_REASONS[idx], note:note, submittedAt:new Date().toLocaleString('zh-CN')};
+  a.appealResult='pending';
+  saveActions(all);
+  viewActions();
+}
+function reviewAppeal(id, result){
+  const all=getActions(); const a=all.find(x=>x.id===id);
+  if(!a) return;
+  if(result==='approved'){
+    const reply=prompt('通过申诉。可填写处理意见（可选）：')||'';
+    a.appealResult='approved'; a.appealReply=reply;
+    a.status='done'; a.doneAt=new Date().toLocaleString('zh-CN');
+  } else {
+    const reply=prompt('驳回申诉。请填写驳回原因（建议填写，店长可见）：')||'';
+    a.appealResult='rejected'; a.appealReply=reply;
+    a.status='pending';
+  }
+  a.appealReviewedAt=new Date().toLocaleString('zh-CN');
+  saveActions(all);
+  viewActions();
+}
+// —— 钉钉推送（保留备用；当前改用站内待办，不推钉钉）——
 async function dingPush(title, text){
   const cfg=getDingCfg();
   if(!cfg.webhook || !cfg.webhook.trim()) return {err:'未配置钉钉机器人 webhook 地址（请在下方「钉钉推送配置」填写）'};
@@ -2075,9 +2109,16 @@ function viewActions(){
   const pending=acts.filter(a=>a.status==='pending').length;
   const doing=acts.filter(a=>a.status==='doing').length;
   const done=acts.filter(a=>a.status==='done').length;
+  const appeal=acts.filter(a=>a.status==='appeal').length;
   const prioCls={'P0':'b-red','P1':'b-amber','P2':'b-dim'};
-  const stCls={'pending':'b-amber','doing':'b-cyan','done':'b-green'};
-  const stTxt={'pending':'待办','doing':'进行中','done':'已完成'};
+  const stCls={'pending':'b-amber','doing':'b-cyan','done':'b-green','appeal':'b-red'};
+  const stTxt={'pending':'待办','doing':'进行中','done':'已完成','appeal':'申诉中'};
+  const appealBadge=a=>{
+    if(!a.appeal) return '';
+    if(a.appealResult==='approved') return `<span class="badge b-green">申诉通过</span>`;
+    if(a.appealResult==='rejected') return `<span class="badge b-dim">申诉驳回</span>`;
+    return `<span class="badge b-red">申诉待处理</span>`;
+  };
   const row=a=>`
     <div class="kb-card" style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
@@ -2085,16 +2126,27 @@ function viewActions(){
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
             <span class="badge ${prioCls[a.priority]||'b-dim'}">${a.priority||'P1'}</span>
             <span class="badge ${stCls[a.status]||'b-dim'}">${stTxt[a.status]||a.status}</span>
+            ${a.appeal?appealBadge(a):''}
             <b style="font-size:14px">${a.title||''}</b>
           </div>
           ${a.store?`<div class="hint" style="margin:2px 0">店铺：${a.store}${a.owner?(' · 责任人：'+a.owner):''}</div>`:''}
           ${a.detail?`<div style="font-size:13px;margin:4px 0">${a.detail}</div>`:''}
           ${a.expected?`<div class="hint" style="margin:2px 0">🎯 预期：${a.expected}</div>`:''}
+          ${a.appeal?`<div class="callout ${a.appealResult==='approved'?'':'amber'}" style="margin:6px 0;padding:6px 10px">
+            <b>📢 申诉</b>：${a.appeal.reason||'—'}
+            ${a.appeal.note?`<div style="margin-top:2px">说明：${a.appeal.note}</div>`:''}
+            <div class="hint" style="margin-top:2px">提交：${a.appeal.submittedAt||'—'}${a.appealReviewedAt?(' · 处理：'+a.appealReviewedAt):''}</div>
+            ${a.appealReply?`<div style="margin-top:2px"><b>${a.appealResult==='approved'?'处理意见':'驳回原因'}</b>：${a.appealReply}</div>`:''}
+          </div>`:''}
           <div class="hint" style="margin-top:4px">来源：${a.source||'—'} · ${a.created||''}${a.due?(' · 截止 '+a.due):''}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-          ${a.status!=='done'?`<button class="btn" style="padding:5px 12px;font-size:12px" onclick="setActionStatus('${a.id}','done')">✅ 完成</button>`:''}
+          ${(a.status==='pending'||a.status==='doing')?`<button class="btn" style="padding:5px 12px;font-size:12px" onclick="setActionStatus('${a.id}','done')">✅ 完成</button>`:''}
           ${a.status==='pending'?`<button class="btn ghost" style="padding:5px 12px;font-size:12px" onclick="setActionStatus('${a.id}','doing')">▶ 进行中</button>`:''}
+          ${(!isAdmin && (a.status==='pending'||a.status==='doing'))?`<button class="btn ghost" style="padding:5px 12px;font-size:12px;color:var(--orange)" onclick="appealAction('${a.id}')">⚠️ 申诉</button>`:''}
+          ${(isAdmin && a.status==='appeal' && a.appealResult==='pending')?`
+            <button class="btn" style="padding:5px 12px;font-size:12px;background:#16a34a;border-color:#16a34a" onclick="reviewAppeal('${a.id}','approved')">✅ 通过</button>
+            <button class="btn ghost" style="padding:5px 12px;font-size:12px;color:var(--red)" onclick="reviewAppeal('${a.id}','rejected')">❌ 驳回</button>`:''}
           <button class="btn ghost" style="padding:5px 12px;font-size:12px;color:var(--red)" onclick="delAction('${a.id}')">删除</button>
         </div>
       </div>
@@ -2102,25 +2154,13 @@ function viewActions(){
   const storeOpts=(isAdmin?`<option value="">— 选择店铺 —</option>`:'')+STORES.map(s=>`<option value="${s.store}">${s.store}</option>`).join('');
   mc.innerHTML=`
   <div class="h-title">✅ 行动项跟踪 <span class="tag">执行闭环</span></div>
-  <div class="h-sub">诊断不是终点——把每条结论落成「责任人 + 动作 + 预期指标」，跟踪到完成，下次复盘对照改善${isAdmin?'':'（仅显示本店行动项）'}</div>
-  <div class="grid g3" style="margin-bottom:14px">
-    <div class="card" style="text-align:center"><div style="font-size:30px;font-weight:700;color:var(--orange)">${pending}</div><div class="hint">待办</div></div>
-    <div class="card" style="text-align:center"><div style="font-size:30px;font-weight:700;color:var(--cyan)">${doing}</div><div class="hint">进行中</div></div>
-    <div class="card" style="text-align:center"><div style="font-size:30px;font-weight:700;color:var(--green)">${done}</div><div class="hint">已完成</div></div>
+  <div class="h-sub">诊断不是终点——把每条结论落成「责任人 + 动作 + 预期指标」，跟踪到完成${isAdmin?'；店长对异常数据发起申诉，你在此审批':'；若数据受特殊情况影响，可对行动项发起申诉，由总负责人审批'}</div>
+  <div class="grid g4" style="margin-bottom:14px">
+    <div class="card" style="text-align:center"><div style="font-size:28px;font-weight:700;color:var(--orange)">${pending}</div><div class="hint">待办</div></div>
+    <div class="card" style="text-align:center"><div style="font-size:28px;font-weight:700;color:var(--cyan)">${doing}</div><div class="hint">进行中</div></div>
+    <div class="card" style="text-align:center"><div style="font-size:28px;font-weight:700;color:var(--green)">${done}</div><div class="hint">已完成</div></div>
+    <div class="card" style="text-align:center"><div style="font-size:28px;font-weight:700;color:var(--red)">${appeal}</div><div class="hint">申诉</div></div>
   </div>
-  ${isAdmin?`
-  <div class="card" style="margin-bottom:14px">
-    <h3><span class="dot"></span>钉钉推送配置</h3>
-    <div class="desc">⚠️ 钉钉 webhook <b>不支持浏览器直连</b>（CORS 限制），推送必须走服务端代理。请先在「AI 知识库 → 代理地址」配置代理（部署 <code>cloudflare-worker.js</code>，含 <code>/chat</code> 和 <code>/dingtalk</code> 两个端点）。<br>webhook 地址与加签密钥在钉钉群「群设置 → 智能群助手 → 添加机器人 → 自定义」中获取。</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-      <input class="inp" id="ding_webhook" placeholder="webhook 地址（https://oapi.dingtalk.com/robot/send?access_token=...）" value="${(getDingCfg().webhook||'')}" style="flex:2;min-width:280px">
-      <input class="inp" id="ding_secret" placeholder="加签密钥（可选，机器人「加签」开启时填）" value="${(getDingCfg().secret||'')}" style="flex:1;min-width:180px">
-    </div>
-    <div class="btn-row" style="margin-top:10px">
-      <button class="btn ghost" onclick="saveDingCfg({webhook:document.getElementById('ding_webhook').value.trim(),secret:document.getElementById('ding_secret').value.trim()});alert('钉钉配置已保存')">💾 保存配置</button>
-      <button class="btn" onclick="pushActionsToDing()">📤 推送未完成行动项到钉钉</button>
-    </div>
-  </div>`:''}
   <div class="card" style="margin-bottom:14px">
     <h3><span class="dot"></span>新增行动项</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
