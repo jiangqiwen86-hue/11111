@@ -1864,23 +1864,29 @@ function renderSketchSVG(sketch){
 // ===== 场景诊断报告渲染（原图标注 + 草图 + 文字）=====
 function renderSceneReport(base64, text, sizeInfo){
   let marks=[], sketch=null;
-  // 宽容解析：优先 ```json 块，其次 ``` 任意块，再其次从全文提取含 marks 的 {...} 对象
-  let jsonStr=null, jsonBlock=null;
-  let m1=text.match(/```(?:json|JSON)?\s*([\s\S]*?)```/);
-  if(m1){ jsonStr=m1[1]; jsonBlock=m1[0]; }
-  else{
-    const m2=text.match(/\{[\s\S]*?"marks"\s*:\s*\[[\s\S]*?\]\s*,\s*"sketch"[\s\S]*?\}\s*\}/);
-    if(m2){ jsonStr=m2[0]; jsonBlock=m2[0]; }
-  }
-  let cleanText=text;
-  if(jsonStr){
+  let cleanText=text, jsonBlock=null;
+  // 遍历所有 ``` 代码块，找能 JSON.parse 出 marks/sketch 的那个（AI 可能在文字里画漏斗图等其它代码块）
+  const blocks=text.match(/```[\s\S]*?```/g)||[];
+  for(const block of blocks){
+    const inner=block.replace(/^```(?:json|JSON)?\s*/,'').replace(/```\s*$/,'');
     try{
-      const obj=JSON.parse(jsonStr.trim());
-      if(obj && obj.marks && obj.marks.length) marks=obj.marks;
-      if(obj && obj.sketch) sketch=obj.sketch;
-      cleanText=text.replace(jsonBlock,'').trim();
+      const obj=JSON.parse(inner.trim());
+      if(obj && (obj.marks || obj.sketch)){
+        if(obj.marks && obj.marks.length) marks=obj.marks;
+        if(obj.sketch) sketch=obj.sketch;
+        jsonBlock=block;
+        break;
+      }
     }catch(e){}
   }
+  // 兜底：全文提取含 marks 的对象（无代码块标记时）
+  if(!jsonBlock){
+    const m2=text.match(/\{\s*"marks"\s*:\s*\[[\s\S]*?\]\s*(?:,\s*"sketch"\s*:\s*\{[\s\S]*?\})?\s*\}/);
+    if(m2){
+      try{ const obj=JSON.parse(m2[0]); if(obj.marks && obj.marks.length) marks=obj.marks; if(obj.sketch) sketch=obj.sketch; jsonBlock=m2[0]; }catch(e){}
+    }
+  }
+  if(jsonBlock){ cleanText=text.replace(jsonBlock,'').trim(); }
   // 导出按钮
   const exportBtns=`<div style="display:flex;gap:8px;margin:4px 0 10px"><button class="btn" style="padding:6px 12px" onclick="exportConclusion()">📥 导出结论</button><button class="btn ghost" style="padding:6px 12px" onclick="exportConclusionHtml()">导出报告(HTML)</button></div>`;
   // 原图 + 标注框
@@ -1926,19 +1932,19 @@ async function aiAnalyzeScene(){
     const file=fileInput.files[0];
     const base64=await compressImage(file);
     const st=getTargetStore('scene');
-    let prompt='请识别这张【直播间场景截图】，从「灯光布光、背景氛围、产品陈列、画面布局与构图、主播/产品位置、画面贴片与文字、色彩与清晰度」等维度，逐项指出当前存在的问题，并给出可落地的优化建议（贴合该品类）。';
+    let prompt='请识别这张【直播间场景截图】，严格按下面顺序输出两部分：先输出第一部分（JSON），再输出第二部分（简要文字）。\n';
     if(st){
       const s=DATA.store_series[st];
       const periods=Object.keys(s.months||{}).sort();
       const cur=periods.length?s.months[periods[periods.length-1]]:null;
-      prompt+='\n\n【店铺】'+st+'（'+s.cat+' · '+s.country+' · '+s.manager+'）';
+      prompt+='\n【店铺】'+st+'（'+s.cat+' · '+s.country+' · '+s.manager+'）';
       if(cur){
         prompt+='\n【最新期指标】'+JSON.stringify({gmv:Math.round(cur.gmv), 场均GMV:Math.round(cur.avg_gmv), PCR:cur.pcr+'%', CTR:cur.ctr+'%', 观看秒:Math.round(cur.watch), 新关注:cur.follow, 健康度:cur.score});
       }
       prompt+='\n【大盘达标线(中位数)】'+JSON.stringify(benchSummary());
       const ctx=catCtx(s.cat); if(ctx) prompt+=ctx;
     }
-    prompt+='\n\n请务必在文字诊断之后，再输出一段【图上标注 + 优化草图】数据，严格用三个反引号 json 包裹（放在最后）。注意：marks 给 3-5 个最关键的标注即可（不要超过 6 个），每个 issue/fix 不超过 25 字；sketch.zones 给 5 条布局要点即可。格式：\n```json\n{\n  "marks": [\n    {"n":1, "label":"灯光", "x":15, "y":10, "w":40, "h":20, "issue":"顶光偏暗", "fix":"加2盏环形补光灯"},\n    {"n":2, "label":"产品陈列", "x":55, "y":30, "w":35, "h":40, "issue":"产品零散", "fix":"主推品前置居中"}\n  ],\n  "sketch": {\n    "title":"优化后直播间布局草图",\n    "zones":["主播居中偏左","主推产品右侧前景陈列","背景墙放品牌logo+活动贴片","左右45度各一盏补光灯","前景桌面放引流款+价格牌"]\n  }\n}\n```\n坐标 x/y/w/h 是图片宽高的百分比(0-100)。';
+    prompt+='\n\n【第一部分·图上标注+优化草图（这是必须输出的核心结果，严格用三个反引号 json 包裹，只输出一个 json 块，不要输出其它代码块）】\n```json\n{"marks":[{"n":1,"label":"灯光","x":15,"y":10,"w":40,"h":20,"issue":"顶光偏暗","fix":"加2盏环形补光灯"},{"n":2,"label":"产品陈列","x":55,"y":30,"w":35,"h":40,"issue":"产品零散","fix":"主推品前置居中"}],"sketch":{"title":"优化后直播间布局草图","zones":["主播居中偏左","主推产品右侧前景陈列","背景墙放品牌logo+活动贴片","左右45度各一盏补光灯","前景桌面放引流款+价格牌"]}}\n```\n要求：marks 给 3-5 个画面中最需要调整的区域（x/y/w/h 为图片宽高百分比 0-100，每个 issue/fix 不超过 20 字）；sketch.zones 给 5 条优化后布局要点。\n\n【第二部分·文字诊断（简要，总字数控制在 300 字以内，每条一句话，禁止长篇展开）】从灯光布光、背景氛围、产品陈列、画面构图、主播/产品位置、贴片文字、色彩清晰度 7 个维度中，只挑最关键的 3-5 个问题，每个问题一句话点出 + 一句优化建议。';
     const r=await callDeepSeekVision(prompt, base64);
     const sizeInfo=`<span style="color:var(--dim)">（原图 ${Math.round(file.size/1024)}KB → 处理后约 ${Math.round(base64.length*3/4/1024)}KB）</span>`;
     if(r.err){ out.innerHTML=`<div class="callout amber"><b>识别失败</b>${r.err}<br>${sizeInfo}</div>`; }
