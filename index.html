@@ -510,12 +510,14 @@ const ICONS={
   standard:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5 17.5 3l3.5 3.5L6.5 21z"/><line x1="7" y1="13" x2="11" y2="17"/><line x1="11" y1="9" x2="15" y2="13"/></svg>',
   ai:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c1 1 1.5 2 1.5 3.5h5c0-1.5 .5-2.5 1.5-3.5A6 6 0 0 0 12 3z"/></svg>',
   import:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16a4 4 0 1 1 .8-7.9 5.5 5.5 0 0 1 10.7 1.5A4 4 0 0 1 18 16"/><polyline points="12 12 12 21"/><polyline points="9 15 12 12 15 15"/></svg>',
-  account:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'
+  account:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  sessions:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="14" height="14" rx="2"/><polygon points="16 10 22 7 22 17 16 14"/></svg>'
 };
 const NAV=[
   {group:'总览', items:[
     {id:'dashboard', ic:ICONS.dashboard, txt:'数据看板'},
     {id:'review', ic:ICONS.review, txt:'直播复盘'},
+    {id:'sessions', ic:ICONS.sessions, txt:'场次复盘'},
     {id:'bench', ic:ICONS.bench, txt:'标杆/问题盘点'},
     {id:'actions', ic:ICONS.actions, txt:'行动项跟踪'},
     {id:'history', ic:ICONS.history, txt:'诊断留痕'},
@@ -560,7 +562,7 @@ function switchView(id){
   const n=document.getElementById('nav_'+id); if(n) n.classList.add('active');
   const mc=document.getElementById('mainContent');
   mc.innerHTML='';
-  const V={dashboard:viewDashboard, review:viewReview, bench:viewBench, actions:viewActions, history:viewHistory, report:viewReport, weekly:viewWeekly, standard:viewStandard, ai:viewAI, import:viewImport, account:viewAccount};
+  const V={dashboard:viewDashboard, review:viewReview, sessions:viewSessions, bench:viewBench, actions:viewActions, history:viewHistory, report:viewReport, weekly:viewWeekly, standard:viewStandard, ai:viewAI, import:viewImport, account:viewAccount};
   (V[id]||viewDashboard)();
 }
 
@@ -2445,6 +2447,152 @@ function viewHistory(){
   <div class="card"><h3><span class="dot"></span>诊断时间线（${hist.length}）</h3>
     ${hist.length?hist.map(row).join(''):'<div class="hint" style="padding:20px 0">暂无留痕。做一次「直播复盘 → AI 诊断」或更新行动项后，这里会自动记录。</div>'}
   </div>`;
+}
+
+// ================= 视图11b：场次复盘（每场直播维度，预留） =================
+// 场次数据字段定义（每场直播一条记录，复盘逻辑复用月维度：漏斗卡点 + 瓶颈7维 + AI诊断 + 行动项 + 申诉）
+const SESSION_FIELDS=[
+  {key:'store',label:'店铺',need:true},{key:'code',label:'店编'},{key:'cat',label:'品类'},{key:'country',label:'国家'},
+  {key:'manager',label:'店长'},{key:'base',label:'直播基地'},{key:'date',label:'直播日期',need:true},{key:'start',label:'开播时间'},
+  {key:'sec',label:'直播时长（秒）'},{key:'viewers',label:'观看人数'},{key:'watch',label:'平均观看时长（秒）'},
+  {key:'follow',label:'新关注量'},{key:'exposure',label:'产品曝光量'},{key:'clicks',label:'商品点击量'},
+  {key:'ctr',label:'点击率CTR'},{key:'orders',label:'支付订单量'},{key:'cvr',label:'CVR'},{key:'pcr',label:'PCR'},
+  {key:'gmv',label:'直播GMV',need:true},{key:'aov',label:'客单价'}
+];
+function getSessions(){ try{ const a=JSON.parse(localStorage.getItem('liveops_sessions')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function saveSessions(a){ localStorage.setItem('liveops_sessions', JSON.stringify(a)); }
+// 场次数据解析（二维数组：Excel 或粘贴 TSV 拆分后传入；复用月维度字段匹配风格）
+function parseSessions(rows){
+  const header=rows[0]||[];
+  const col=name=>{ const i=header.findIndex(h=>h!=null && String(h).trim().includes(name)); return i<0?null:i; };
+  const ci={store:col('店铺'),code:col('店编'),cat:col('品类'),country:col('国家'),manager:col('店长'),base:col('基地'),date:col('直播日期'),start:col('开播时间'),sec:col('直播时长'),viewers:col('观看人数'),watch:col('平均观看时长'),follow:col('新关注'),exposure:col('曝光'),clicks:col('点击量'),ctr:col('CTR'),orders:col('订单'),cvr:col('CVR'),pcr:col('PCR'),gmv:col('GMV'),aov:col('客单价')};
+  if(ci.store==null || ci.gmv==null) return {err:'未识别到「店铺」或「直播GMV」列，请确认表头含这两列。'};
+  const g=(r,k)=>{ const i=ci[k]; return i==null?null:r[i]; };
+  const toNum=x=>{ if(x==null||String(x).trim()==='')return null; const n=parseFloat(String(x).replace(/[%,，\s]/g,'')); return isNaN(n)?null:n; };
+  const list=[];
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i]; if(!r) continue;
+    const store=String(g(r,'store')||'').trim(); if(!store) continue;
+    list.push({id:'s_'+i+'_'+Math.random().toString(36).slice(2,6), store:store, code:String(g(r,'code')||'').trim(), cat:String(g(r,'cat')||'').trim(), country:String(g(r,'country')||'').trim(), manager:String(g(r,'manager')||'').trim(), base:String(g(r,'base')||'').trim(), date:String(g(r,'date')||'').trim(), start:String(g(r,'start')||'').trim(), sec:toNum(g(r,'sec'))||0, viewers:toNum(g(r,'viewers'))||0, watch:toNum(g(r,'watch')), follow:toNum(g(r,'follow'))||0, exposure:toNum(g(r,'exposure'))||0, clicks:toNum(g(r,'clicks'))||0, ctr:toNum(g(r,'ctr')), orders:toNum(g(r,'orders'))||0, cvr:toNum(g(r,'cvr')), pcr:toNum(g(r,'pcr')), gmv:toNum(g(r,'gmv'))||0, aov:toNum(g(r,'aov'))});
+  }
+  if(!list.length) return {err:'未解析到有效场次数据行。'};
+  return {list};
+}
+// 单场诊断（复用月维度诊断框架：漏斗卡点 + 瓶颈7维 + AI 深度诊断 + 行动项）
+function diagSession(id){
+  const out=document.getElementById('sessOut');
+  const s=getSessions().find(x=>x.id===id); if(!s){ return; }
+  if(!perm().ai){ alert('当前账号无 AI 分析权限'); return; }
+  out.innerHTML='<span class="typing">▍ AI 诊断中…</span>';
+  // 1) 瓶颈定位（复用 BOTTLENECKS_KB，对照大盘 P25）
+  const bm=DATA.benchmark||{};
+  const p25={pcr:bm.pcr?bm.pcr.p25:null,ctr:bm.ctr?bm.ctr.p25:null,watch:bm.watch?bm.watch.p25:null,follow:bm.follow?bm.follow.p25:null,aov:bm.aov?bm.aov.p25:null};
+  const issues=[];
+  if(s.pcr!=null&&p25.pcr!=null&&s.pcr<p25.pcr) issues.push('pcr');
+  if(s.ctr!=null&&p25.ctr!=null&&s.ctr<p25.ctr) issues.push('ctr');
+  if(s.watch!=null&&p25.watch!=null&&s.watch<p25.watch) issues.push('watch');
+  if(s.follow!=null&&p25.follow!=null&&s.follow<p25.follow) issues.push('follow');
+  if(s.aov!=null&&p25.aov!=null&&s.aov<p25.aov) issues.push('aov');
+  const weakHtml=issues.length?issues.map(k=>{const b=BOTTLENECKS_KB[k];return b?('<div class="kb-card" style="margin-bottom:8px"><b>'+b.name+'</b><div class="hint">'+b.issue+'</div><ul style="margin-left:17px;font-size:12.5px">'+b.fixes.slice(0,3).map(f=>'<li>'+f+'</li>').join('')+'</ul></div>'):'';}).join(''):'<div class="hint">本场各指标均不低于大盘 P25，无明显短板。</div>';
+  // 2) AI 深度诊断（复用 aiAnalyzeStore 同款 prompt 结构）
+  let prompt='请对这场直播做深度诊断：'+JSON.stringify({店铺:s.store,国家:s.country,品类:s.cat,店长:s.manager,日期:s.date,开播:s.start,单场数据:{直播时长秒:s.sec,观看人数:s.viewers,平均观看时长秒:s.watch,新关注:s.follow,曝光:s.exposure,点击:s.clicks,CTR:s.ctr,订单:s.orders,CVR:s.cvr,PCR:s.pcr,直播GMV:s.gmv,客单价:s.aov}}).slice(0,2500)+'\n【全公司大盘达标线(中位数)】'+JSON.stringify(benchSummary())+'\n请指出：1)这场直播哪些指标异常、具体数值与达标线差多少 2)核心问题定位 3)漏斗卡点 4)分优先级(P0/P1/P2)的优化方案（带具体动作、话术、预期指标）。\n\n【行动项·硬性要求】请在文字诊断结束后，输出一段 JSON 行动项数据，严格用三个反引号 json 包裹：\n```json\n{"actions":[{"title":"优化开场钩子","detail":"...","priority":"P0","expected":"...","due":"本周"}]}\n```\n拆成 2-4 条行动项。';
+  const ctx=catCtx(s.cat); if(ctx) prompt+=ctx;
+  return callDeepSeek(prompt, 4000).then(r=>{
+    if(r.err){ out.innerHTML='<div class="callout amber"><b>AI 调用失败</b>'+r.err+'</div>'; return; }
+    let actionNote='';
+    const acts=parseActionsFromText(r.text);
+    if(acts.length){ const n=commitActions(s.store, acts, '场次AI诊断'); actionNote='<div class="callout" style="margin-top:10px">✅ 已自动生成 <b>'+n+'</b> 条行动项（左侧「行动项跟踪」查看）。</div>'; commitHistory(s.store, 'AI诊断', {note:'场次复盘：'+s.date+' 单场诊断'+(acts.length?('，生成 '+acts.length+' 条行动项'):'')}); }
+    out.innerHTML='<div style="line-height:1.8;font-size:14px">'+mdToHtml(r.text)+'</div>'+actionNote;
+    window._export={title:'场次诊断_'+s.store+'_'+s.date, md:'# 场次直播诊断\n\n**店铺**：'+s.store+' · **日期**：'+s.date+' · **品类**：'+(s.cat||'—')+'\n\n'+r.text};
+  }).catch(e=>{ out.innerHTML='<div class="callout amber"><b>诊断失败</b>'+String(e)+'</div>'; });
+}
+function viewSessions(){
+  const mc=document.getElementById('mainContent');
+  const isAdmin=session.role==='admin';
+  let list=getSessions();
+  if(!isAdmin){ const st=myStore(); list=list.filter(s=>s.store===st); }
+  const fieldChips=SESSION_FIELDS.map(f=>`<span class="badge ${f.need?'b-cyan':'b-dim'}" style="margin:2px">${f.label}${f.need?'*':''}</span>`).join('');
+  const storeOpts=(isAdmin?`<option value="">— 全部店铺 —</option>`:'')+STORES.map(s=>`<option value="${s.store}">${s.store}</option>`).join('');
+  const row=s=>`<div class="kb-card" style="margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+          <b style="font-size:14px">${s.store}</b>
+          ${s.cat?`<span class="badge b-dim">${s.cat}</span>`:''}
+          ${s.date?`<span class="badge b-cyan">${s.date}${s.start?(' '+s.start):''}</span>`:''}
+        </div>
+        <div style="font-size:13px;color:var(--muted)">直播GMV <b style="color:var(--text)">${fmtWan(s.gmv)}</b> · 时长 ${Math.round(s.sec/60)}分 · PCR ${s.pcr!=null?s.pcr+'%':'—'} · CTR ${s.ctr!=null?s.ctr+'%':'—'} · 观看 ${s.watch!=null?s.watch+'s':'—'} · 新关注 ${s.follow||0}${s.aov!=null?(' · 客单价 '+fmtWan(s.aov)):''}</div>
+      </div>
+      <button class="btn" style="padding:6px 14px;font-size:12px" onclick="diagSession('${s.id}')">🔍 AI 诊断</button>
+    </div>
+  </div>`;
+  mc.innerHTML=`
+  <div class="h-title">🎬 场次复盘 <span class="tag">每场直播维度</span></div>
+  <div class="h-sub">按「每场直播」一条记录做数据复盘，诊断逻辑与月维度一致（漏斗卡点 + 瓶颈7维 + AI深度诊断 + 行动项 + 申诉）。此板块已预留，导入场次数据后即可用。</div>
+  <div class="card" style="margin-bottom:14px">
+    <h3><span class="dot"></span>场次数据导入（预留）</h3>
+    <div class="desc">把每场直播数据按下面字段整理成 Excel / 表格，上传或粘贴后自动解析。字段与《直播店铺统计.xlsx》一致，仅把「直播场次」换成「直播日期 + 开播时间」。</div>
+    <div class="callout cyan"><b>支持的字段（打 * 为必填）</b><div style="margin-top:6px">${fieldChips}</div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input type="file" id="sessFile" accept=".xlsx,.xls" class="inp" style="max-width:280px">
+      <button class="btn" onclick="importSessionsExcel()">📥 上传 Excel 解析</button>
+      <button class="btn ghost" onclick="document.getElementById('sessPaste').style.display=document.getElementById('sessPaste').style.display==='none'?'block':'none'">📋 粘贴表格</button>
+    </div>
+    <textarea id="sessPaste" class="inp" style="display:none;margin-top:10px;min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px" placeholder="店铺	品类	国家	店长	直播日期	直播时长（秒）	直播GMV	PCR	CTR	平均观看时长（秒）	新关注量"></textarea>
+    <div class="btn-row" style="margin-top:10px"><button class="btn ghost" onclick="importSessionsPaste()">解析粘贴数据</button><button class="btn ghost" onclick="loadSessionSample()">载入示例</button><button class="btn ghost" onclick="clearSessions()">清空场次数据</button></div>
+    <div id="sessImportOut" style="margin-top:10px"></div>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <h3><span class="dot"></span>场次列表（${list.length}）</h3>
+    ${isAdmin?`<select class="sel" id="sessStoreFilter" style="max-width:260px;margin-bottom:10px" onchange="viewSessions()">${storeOpts}</select>`:''}
+    ${list.length?list.map(row).join(''):'<div class="hint" style="padding:20px 0">暂无场次数据。导入后这里会展示每场直播，点「AI 诊断」即可按单场维度复盘（复用月维度的诊断逻辑）。</div>'}
+  </div>
+  <div id="sessOut"></div>
+  <div class="footer-note">场次维度复盘 · 逻辑与月维度一致 · LiveOps Console</div>`;
+}
+function importSessionsExcel(){
+  const out=document.getElementById('sessImportOut');
+  const fileInput=document.getElementById('sessFile');
+  const file=fileInput.files && fileInput.files[0];
+  if(!file){ out.innerHTML='<div class="callout amber">请先选择 Excel 文件</div>'; return; }
+  if(typeof XLSX==='undefined'){ out.innerHTML='<div class="callout amber">Excel 解析库加载失败，请刷新重试或改用「粘贴表格」。</div>'; return; }
+  out.innerHTML='<span class="typing">▍ 正在解析…</span>';
+  file.arrayBuffer().then(buf=>{
+    const wb=XLSX.read(buf,{type:'array'}); const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    const parsed=parseSessions(rows);
+    if(parsed.err){ out.innerHTML='<div class="callout amber"><b>解析失败</b>'+parsed.err+'</div>'; return; }
+    const all=getSessions().concat(parsed.list); saveSessions(all);
+    out.innerHTML='<div class="callout green">✅ 已导入 <b>'+parsed.list.length+'</b> 场数据（累计 '+all.length+' 场）。</div>';
+    viewSessions();
+  }).catch(e=>{ out.innerHTML='<div class="callout amber"><b>解析失败</b>'+String(e)+'</div>'; });
+}
+function importSessionsPaste(){
+  const out=document.getElementById('sessImportOut');
+  const text=document.getElementById('sessPaste').value;
+  if(!text.trim()){ out.innerHTML='<div class="callout amber">请先粘贴数据</div>'; return; }
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  const rows=lines.map(l=>l.split('\t'));
+  const parsed=parseSessions(rows);
+  if(parsed.err){ out.innerHTML='<div class="callout amber"><b>解析失败</b>'+parsed.err+'</div>'; return; }
+  const all=getSessions().concat(parsed.list); saveSessions(all);
+  out.innerHTML='<div class="callout green">✅ 已导入 <b>'+parsed.list.length+'</b> 场数据（累计 '+all.length+' 场）。</div>';
+  viewSessions();
+}
+function loadSessionSample(){
+  // 用现有店铺数据生成示例场次（脱敏演示，逻辑复用月维度）
+  const sample=DATA.classification.ranking.slice(0,6).map((r,i)=>{
+    const sess=Math.max(1,Math.round(r.gmv/ (r.avg_gmv||1)));
+    return [r.store,r.cat,r.country,r.manager,'2026-08-1'+(i+1),'18:00',7200,Math.round(r.gmv/sess*0.4),r.watch,r.follow,r.gmv/sess*2,r.pcr,r.ctr,Math.round(r.gmv/sess),r.aov];
+  });
+  const header=['店铺','品类','国家','店长','直播日期','开播时间','直播时长（秒）','观看人数','平均观看时长（秒）','新关注量','产品曝光量','PCR','CTR','直播GMV','客单价'];
+  document.getElementById('sessPaste').value=header.join('\t')+'\n'+sample.map(s=>s.join('\t')).join('\n');
+  document.getElementById('sessPaste').style.display='block';
+  document.getElementById('sessImportOut').innerHTML='<div class="hint">示例已填入下方文本框，点「解析粘贴数据」即可导入。</div>';
+}
+function clearSessions(){
+  if(!confirm('确定清空全部场次数据吗？')) return;
+  saveSessions([]); viewSessions();
 }
 
 // ================= 视图11：复盘报告（一键导出 HTML） =================
