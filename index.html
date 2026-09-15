@@ -1708,11 +1708,21 @@ function viewAI(){
       <span class="hint" style="margin:0">抽帧数</span>
       <select id="videoFrames" class="sel" style="max-width:110px"><option value="4">4 帧</option><option value="6" selected>6 帧</option><option value="8">8 帧</option></select>
     </div>
-    <div class="btn-row"><button class="btn" onclick="aiAnalyzeVideo()">🎬 拆解分析</button>
-      <button class="btn ghost" onclick="exportConclusion()">📥 导出结论</button>
+    <div class="btn-row"><button class="btn" onclick="aiAnalyzeVideo()">🎬 拆解分析</button></div>
+    <div class="ai-out" id="videoOut" style="margin-top:10px"><span style="color:var(--dim)">画面拆解结果将显示在这里…</span></div>
+
+    <h4 style="margin:16px 0 8px">🎙️ 语音转文字（需本机运行 Whisper 服务）</h4>
+    <div class="desc" style="margin-bottom:6px">把主播说的话转成泰语文字，再翻译成中文。需先在电脑上启动 Whisper 服务（见 outputs/whisper-server 部署说明）。</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <input class="inp" id="whisperUrlInput" placeholder="http://127.0.0.1:8765" value="${whisperUrl()}" style="max-width:320px">
+      <button class="btn ghost" onclick="saveWhisperUrl(document.getElementById('whisperUrlInput').value);alert('Whisper 服务地址已保存')">保存地址</button>
+    </div>
+    <div class="btn-row"><button class="btn" onclick="transcribeVideoAudio()">🎙️ 语音转文字</button></div>
+    <div class="ai-out" id="videoAsrOut" style="margin-top:10px"><span style="color:var(--dim)">语音转写与中文翻译将显示在这里…</span></div>
+
+    <div class="btn-row" style="margin-top:10px"><button class="btn ghost" onclick="exportConclusion()">📥 导出结论</button>
       <button class="btn ghost" onclick="exportConclusionHtml()">导出报告(HTML)</button></div>
-    <div class="callout amber" style="margin-top:8px;font-size:12px"><b>说明</b>：AI 可识别画面内容、翻译画面中的文字（字幕/价格牌/标签）。主播「语音逐字翻译」需接入语音识别(ASR)服务，当前版本以画面文字翻译 + 话术意图推断为主，语音内容不会被编造。</div>
-    <div class="ai-out" id="videoOut" style="margin-top:10px"><span style="color:var(--dim)">拆解结果将显示在这里…</span></div>
+    <div class="callout amber" style="margin-top:8px;font-size:12px"><b>说明</b>：画面拆解识别画面内容、翻译画面文字；语音转写需本机运行 Whisper 服务（识别泰语语音 → 泰语文字 → DeepSeek 翻译成中文）。</div>
   </div>
 
   <div class="card"><h3><span class="dot"></span>💬 直播话术脚本优化</h3>
@@ -2079,6 +2089,42 @@ async function aiAnalyzeVideo(){
     const md='# 视频片段拆解报告\n\n**片段时长**：'+fmtVideoDuration(duration)+' · **抽取帧数**：'+frames.length+'\n\n## 逐帧分析\n\n'+frameResults.map((fr,i)=>'### 第 '+(i+1)+' 帧（约 '+fr.time+' 秒）\n'+fr.text).join('\n\n')+'\n\n## AI 完整拆解报告\n\n'+(sr.err?('汇总失败：'+sr.err):sr.text);
     window._export={title:'视频片段拆解_'+new Date().toISOString().slice(0,10), md:md};
   }catch(e){ out.innerHTML='<div class="callout amber"><b>视频处理失败</b>'+String(e)+'</div>'; }
+}
+
+// ===== 语音转文字（本地 Whisper ASR + DeepSeek 翻译成中文）=====
+function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function whisperUrl(){ return (localStorage.getItem('liveops_whisper_url')||'http://127.0.0.1:8765').trim(); }
+function saveWhisperUrl(v){ if(v){ localStorage.setItem('liveops_whisper_url', v.trim()); } else { localStorage.removeItem('liveops_whisper_url'); } }
+async function transcribeVideoAudio(){
+  const out=document.getElementById('videoAsrOut');
+  const fi=document.getElementById('videoFile');
+  if(!fi||!fi.files||!fi.files.length){ out.innerHTML='<span style="color:var(--dim)">请先在上方上传直播片段</span>'; return; }
+  const file=fi.files[0];
+  const url=whisperUrl();
+  if(!url){ out.innerHTML='<div class="callout amber">请先填写 Whisper 服务地址</div>'; return; }
+  out.innerHTML='<span class="typing">▍ 正在上传并转写（首次会加载模型，约几秒）…</span>';
+  try{
+    const fd=new FormData(); fd.append('file', file);
+    const res=await fetch(url.replace(/\/+$/,'')+'/transcribe', {method:'POST', body:fd});
+    const j=await res.json();
+    if(!res.ok || j.error){ out.innerHTML='<div class="callout amber"><b>转写失败</b>'+(j.error||('HTTP '+res.status))+'<br>请确认本地 Whisper 服务已启动（'+url.replace(/\/+$/,'')+'/health 可访问）。</div>'; return; }
+    const thaiText=(j.text||'').trim();
+    const segs=j.segments||[];
+    let transHtml='', zhText='';
+    if(thaiText){
+      out.innerHTML='<span class="typing">▍ 转写完成，正在翻译成中文…</span>';
+      const p='请把下面这段泰语直播话术逐段翻译成中文，保持分段与时间戳对应。\n\n【识别结果（含时间戳）】\n'+segs.map(s=>'['+s.start+'-'+s.end+'秒] '+s.text).join('\n')+'\n\n请输出：\n1. 一句话概述：这段主播在讲什么。\n2. 逐段中文翻译（格式：[开始-结束秒] 中文译文）。\n只输出翻译，不要解释，不要编造原文没有的内容。';
+      const r=await callDeepSeek(p, 4000);
+      if(r.err){ transHtml='<div class="callout amber"><b>翻译失败</b>'+r.err+'</div>'; }
+      else { zhText=r.text; transHtml=mdToHtml(r.text); }
+    } else { transHtml='<div class="callout amber">未识别到语音内容。</div>'; }
+    const segHtml=segs.length?('<div class="tbl-wrap" style="margin-top:6px"><table><thead><tr><th style="width:150px">时间</th><th>泰语原文（Whisper 转写）</th></tr></thead><tbody>'+segs.map(s=>'<tr><td class="tnum" style="white-space:nowrap">'+s.start+'s - '+s.end+'s</td><td>'+escHtml(s.text)+'</td></tr>').join('')+'</tbody></table></div>'):'';
+    out.innerHTML='<div class="callout green"><b>🎙️ 语音转写完成</b> · 识别时长 '+Math.round(j.duration||0)+' 秒 · 语言 '+(j.language||'th')+' · 转写用时 '+Math.round(j.elapsed_s||0)+' 秒</div>'
+      +'<h4 style="margin:14px 0 8px">泰语原文（Whisper 转写）</h4>'+segHtml
+      +'<h4 style="margin:14px 0 8px">中文翻译</h4><div style="line-height:1.8;font-size:14px">'+transHtml+'</div>';
+    const md='# 直播片段语音转写\n\n**识别时长**：'+Math.round(j.duration||0)+' 秒 · **语言**：泰语\n\n## 泰语原文（Whisper 转写）\n\n'+segs.map(s=>'['+s.start+'-'+s.end+'秒] '+s.text).join('\n')+'\n\n## 中文翻译\n\n'+zhText;
+    window._export={title:'直播片段语音转写_'+new Date().toISOString().slice(0,10), md:md};
+  }catch(e){ out.innerHTML='<div class="callout amber"><b>请求失败</b>'+String(e)+'<br>请确认本地 Whisper 服务已启动，浏览器能访问 '+url+'。</div>'; }
 }
 
 // ===== 直播话术脚本优化 =====
