@@ -1700,6 +1700,21 @@ function viewAI(){
     <div class="ai-out" id="sceneOut" style="margin-top:10px"><span style="color:var(--dim)">诊断建议将显示在这里…</span></div>
   </div>
 
+  <div class="card"><h3><span class="dot"></span>🎬 视频片段分析（直播切片拆解）</h3>
+    <div class="desc">上传直播片段，AI 自动抽帧拆解：识别画面内容、把画面文字（泰语/印尼语/英语等）翻译成中文、推断营销话术与节奏。建议上传 5 分钟以内的 mp4/webm 片段。</div>
+    ${storeSelector('video')}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <input type="file" id="videoFile" accept="video/*" class="inp" style="max-width:320px">
+      <span class="hint" style="margin:0">抽帧数</span>
+      <select id="videoFrames" class="sel" style="max-width:110px"><option value="4">4 帧</option><option value="6" selected>6 帧</option><option value="8">8 帧</option></select>
+    </div>
+    <div class="btn-row"><button class="btn" onclick="aiAnalyzeVideo()">🎬 拆解分析</button>
+      <button class="btn ghost" onclick="exportConclusion()">📥 导出结论</button>
+      <button class="btn ghost" onclick="exportConclusionHtml()">导出报告(HTML)</button></div>
+    <div class="callout amber" style="margin-top:8px;font-size:12px"><b>说明</b>：AI 可识别画面内容、翻译画面中的文字（字幕/价格牌/标签）。主播「语音逐字翻译」需接入语音识别(ASR)服务，当前版本以画面文字翻译 + 话术意图推断为主，语音内容不会被编造。</div>
+    <div class="ai-out" id="videoOut" style="margin-top:10px"><span style="color:var(--dim)">拆解结果将显示在这里…</span></div>
+  </div>
+
   <div class="card"><h3><span class="dot"></span>💬 直播话术脚本优化</h3>
     <div class="desc">粘贴你的直播话术脚本，AI 逐句优化（综合本店数据、大盘达标线与品类打法）</div>
     ${storeSelector('script')}
@@ -1978,6 +1993,92 @@ async function aiAnalyzeScene(){
     out.innerHTML=rep.display;
     window._export={title:'直播间场景诊断_'+new Date().toISOString().slice(0,10), md:'# 直播间场景诊断\n\n'+fullText, html:rep.content};
   }catch(e){ out.innerHTML='<div class="callout amber"><b>图片处理失败</b>'+String(e)+'</div>'; }
+}
+
+// ===== 视频片段分析（直播切片拆解：抽帧 + 视觉分析 + 画面文字翻译 + 话术推断）=====
+function fmtVideoDuration(sec){ sec=Math.round(sec||0); const m=Math.floor(sec/60), s=sec%60; return (m?m+'分':'')+s+'秒'; }
+function videoSeek(video, t){
+  return new Promise(res=>{
+    let done=false;
+    const onSeeked=()=>{ if(done)return; done=true; video.removeEventListener('seeked',onSeeked); setTimeout(res,30); };
+    video.addEventListener('seeked',onSeeked);
+    try{ video.currentTime=t; }catch(e){ if(!done){ done=true; res(); } }
+  });
+}
+async function extractVideoFrames(file, count){
+  count=count||6;
+  const url=URL.createObjectURL(file);
+  const video=document.createElement('video');
+  video.src=url; video.muted=true; video.playsInline=true; video.preload='auto';
+  await new Promise((res,rej)=>{
+    video.onloadedmetadata=()=>res();
+    video.onerror=()=>rej(new Error('视频加载失败，浏览器可能不支持该格式（建议 mp4/webm）'));
+    video.load();
+  });
+  const duration=video.duration||0;
+  if(!duration){ URL.revokeObjectURL(url); throw new Error('无法读取视频时长'); }
+  const times=[]; const step=duration/(count+1);
+  for(let i=1;i<=count;i++) times.push(Math.min(duration-0.05, step*i));
+  const canvas=document.createElement('canvas'); const ctx=canvas.getContext('2d');
+  const frames=[];
+  for(let i=0;i<times.length;i++){
+    await videoSeek(video, times[i]);
+    const w=video.videoWidth, h=video.videoHeight;
+    if(w&&h){
+      const maxW=960, scale=Math.min(1,maxW/w);
+      canvas.width=Math.max(1,Math.round(w*scale)); canvas.height=Math.max(1,Math.round(h*scale));
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      let b64=''; try{ b64=canvas.toDataURL('image/jpeg',0.72); }catch(e){ b64=''; }
+      if(b64&&b64.length>100) frames.push({time:times[i], base64:b64});
+    }
+  }
+  URL.revokeObjectURL(url);
+  return {duration, frames};
+}
+async function aiAnalyzeVideo(){
+  const out=document.getElementById('videoOut');
+  const fi=document.getElementById('videoFile');
+  if(!fi||!fi.files||!fi.files.length){ out.innerHTML='<span style="color:var(--dim)">请先上传直播片段（mp4/webm 等）</span>'; return; }
+  const file=fi.files[0];
+  const count=parseInt((document.getElementById('videoFrames')||{}).value||'6',10);
+  const st=getTargetStore('video');
+  out.innerHTML='<span class="typing">▍ 正在读取视频并抽帧…</span>';
+  try{
+    const {duration, frames}=await extractVideoFrames(file, count);
+    if(!frames.length){ out.innerHTML='<div class="callout amber"><b>抽帧失败</b>未能从视频中提取有效画面，请换一个片段重试。</div>'; return; }
+    let shopCtx='';
+    if(st){
+      const s=DATA.store_series[st];
+      if(s){
+        const periods=Object.keys(s.months||{}).sort(); const cur=periods.length?s.months[periods[periods.length-1]]:null;
+        shopCtx='\n\n【店铺】'+st+'（'+s.cat+' · '+s.country+' · '+s.manager+'）';
+        if(cur) shopCtx+='\n【最新期指标】'+JSON.stringify({GMV:Math.round(cur.gmv),场均:Math.round(cur.avg_gmv),PCR:cur.pcr+'%',CTR:cur.ctr+'%',健康度:cur.score});
+        shopCtx+='\n【大盘达标线(中位数)】'+JSON.stringify(benchSummary());
+        const c=catCtx(s.cat); if(c) shopCtx+=c;
+      }
+    }
+    const frameResults=[];
+    for(let i=0;i<frames.length;i++){
+      out.innerHTML='<span class="typing">▍ 正在逐帧分析 '+(i+1)+'/'+frames.length+'…</span>';
+      const f=frames[i];
+      const p='这是从直播片段抽出的第 '+(i+1)+'/'+frames.length+' 帧（视频约 '+Math.round(f.time)+' 秒处）。请严格按下面三段输出（中文）：\n1. 画面内容：场景/产品/人物/动作/陈列/灯光，2-3 句描述。\n2. 画面文字翻译：识别画面中出现的所有文字（泰语/印尼语/英语等），逐条给出「原文 → 中文翻译」；若画面无文字，明确写「无画面文字」。\n3. 营销环节推断：从画面判断主播正在做的营销动作（开场钩子/产品讲解/信任背书/价格锚定/逼单/福利抽奖/互动留人），并推断其话术意图（注意：仅凭画面推断，不要编造主播具体说了哪句话）。'+shopCtx;
+      const r=await callDeepSeekVision(p, f.base64);
+      frameResults.push({time:Math.round(f.time), ok:!r.err, text:r.err?('（本帧识别失败：'+r.err+'）'):r.text});
+    }
+    out.innerHTML='<span class="typing">▍ 正在整合完整拆解报告…</span>';
+    const summaryP='以下是直播片段抽出 '+frames.length+' 帧的逐帧画面分析结果（JSON）：\n'+JSON.stringify(frameResults).slice(0,6000)+'\n\n请整合成一份完整的「直播片段拆解报告」（中文，结构化），包含：\n一、片段整体概述：这个片段在卖什么、在讲什么。\n二、时间线拆解：按时间顺序，每段给出「画面内容 → 画面文字翻译 → 话术意图」。\n三、营销结构诊断：钩子→讲解→信任→逼单 的完整度，指出缺了哪一环。\n四、可借鉴点 + 可优化点：贴合该品类，落到具体动作和话术。\n五、画面文字汇总：所有识别到的原文+中文翻译（去重）。\n\n【硬性边界】语音逐字内容无法从画面获取，严禁编造主播具体说了哪句话；所有话术相关结论统一标注为「画面推断」。';
+    const sr=await callDeepSeek(summaryP, 4000);
+    const summaryHtml = sr.err ? ('<div class="callout amber"><b>汇总失败</b>'+sr.err+'</div>') : mdToHtml(sr.text);
+    const grid=frames.map((f,i)=>'<div style="flex:none;width:130px"><div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--panel2)"><img src="'+f.base64+'" style="width:100%;height:76px;object-fit:cover;display:block"></div><div style="font-size:11px;color:var(--muted);margin-top:4px;text-align:center">第'+(i+1)+'帧 · '+Math.round(f.time)+'s</div></div>').join('');
+    const perFrame=frameResults.map((fr,i)=>'<div class="kb-card" style="margin-bottom:8px"><b>第 '+(i+1)+' 帧（约 '+fr.time+' 秒）</b><div style="font-size:13px;line-height:1.7;margin-top:6px">'+(fr.ok?mdToHtml(fr.text):'<span style="color:var(--amber)">'+fr.text+'</span>')+'</div></div>').join('');
+    out.innerHTML='<div style="display:flex;gap:8px;margin:4px 0 10px"><button class="btn" style="padding:6px 12px" onclick="exportConclusion()">📥 导出结论</button><button class="btn ghost" style="padding:6px 12px" onclick="exportConclusionHtml()">导出报告(HTML)</button></div>'
+      +'<div class="callout cyan"><b>视频片段拆解</b> · 时长 '+fmtVideoDuration(duration)+' · 抽取 '+frames.length+' 帧</div>'
+      +'<h4 style="margin:14px 0 8px">🖼️ 抽帧预览</h4><div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px">'+grid+'</div>'
+      +'<h4 style="margin:14px 0 8px">🔍 逐帧分析</h4>'+perFrame
+      +'<h4 style="margin:14px 0 8px">📋 AI 完整拆解报告</h4><div style="line-height:1.8;font-size:14px">'+summaryHtml+'</div>';
+    const md='# 视频片段拆解报告\n\n**片段时长**：'+fmtVideoDuration(duration)+' · **抽取帧数**：'+frames.length+'\n\n## 逐帧分析\n\n'+frameResults.map((fr,i)=>'### 第 '+(i+1)+' 帧（约 '+fr.time+' 秒）\n'+fr.text).join('\n\n')+'\n\n## AI 完整拆解报告\n\n'+(sr.err?('汇总失败：'+sr.err):sr.text);
+    window._export={title:'视频片段拆解_'+new Date().toISOString().slice(0,10), md:md};
+  }catch(e){ out.innerHTML='<div class="callout amber"><b>视频处理失败</b>'+String(e)+'</div>'; }
 }
 
 // ===== 直播话术脚本优化 =====
