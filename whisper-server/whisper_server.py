@@ -73,7 +73,9 @@ def transcribe():
     if "file" not in request.files:
         return jsonify({"error": "缺少 file 字段"}), 400
     f = request.files["file"]
-    lang = (request.form.get("language") or LANGUAGE).strip() or "th"
+    lang = (request.form.get("language") or LANGUAGE).strip()
+    if lang in ("", "auto"):
+        lang = None  # 自动检测语言
     suffix = os.path.splitext(f.filename or "")[1] or ".mp4"
     tmp_path = None
     try:

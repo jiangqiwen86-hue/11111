@@ -1714,8 +1714,18 @@ function viewAI(){
     <h4 style="margin:16px 0 8px">🎙️ 语音转文字（需本机运行 Whisper 服务）</h4>
     <div class="desc" style="margin-bottom:6px">把主播说的话转成泰语文字，再翻译成中文。需先在电脑上启动 Whisper 服务（见 outputs/whisper-server 部署说明）。</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-      <input class="inp" id="whisperUrlInput" placeholder="http://127.0.0.1:8765" value="${whisperUrl()}" style="max-width:320px">
+      <input class="inp" id="whisperUrlInput" placeholder="http://127.0.0.1:8765" value="${whisperUrl()}" style="max-width:300px">
       <button class="btn ghost" onclick="saveWhisperUrl(document.getElementById('whisperUrlInput').value);alert('Whisper 服务地址已保存')">保存地址</button>
+      <span class="hint" style="margin:0">识别语言</span>
+      <select id="whisperLang" class="sel" style="max-width:150px">
+        <option value="auto" selected>自动检测</option>
+        <option value="th">泰语</option>
+        <option value="ms">马来语</option>
+        <option value="vi">越南语</option>
+        <option value="id">印尼语</option>
+        <option value="tl">菲律宾语(他加禄)</option>
+        <option value="en">英语</option>
+      </select>
     </div>
     <div class="btn-row"><button class="btn" onclick="transcribeVideoAudio()">🎙️ 语音转文字</button></div>
     <div class="ai-out" id="videoAsrOut" style="margin-top:10px"><span style="color:var(--dim)">语音转写与中文翻译将显示在这里…</span></div>
@@ -2104,7 +2114,10 @@ async function transcribeVideoAudio(){
   if(!url){ out.innerHTML='<div class="callout amber">请先填写 Whisper 服务地址</div>'; return; }
   out.innerHTML='<span class="typing">▍ 正在上传并转写（首次会加载模型，约几秒）…</span>';
   try{
+    const langSel=document.getElementById('whisperLang');
+    const lang=(langSel&&langSel.value)?langSel.value:'auto';
     const fd=new FormData(); fd.append('file', file);
+    fd.append('language', lang);
     const res=await fetch(url.replace(/\/+$/,'')+'/transcribe', {method:'POST', body:fd});
     const j=await res.json();
     if(!res.ok || j.error){ out.innerHTML='<div class="callout amber"><b>转写失败</b>'+(j.error||('HTTP '+res.status))+'<br>请确认本地 Whisper 服务已启动（'+url.replace(/\/+$/,'')+'/health 可访问）。</div>'; return; }
@@ -2113,7 +2126,7 @@ async function transcribeVideoAudio(){
     let transHtml='', zhText='';
     if(thaiText){
       out.innerHTML='<span class="typing">▍ 转写完成，正在翻译成中文…</span>';
-      const p='请把下面这段泰语直播话术逐段翻译成中文，保持分段与时间戳对应。\n\n【识别结果（含时间戳）】\n'+segs.map(s=>'['+s.start+'-'+s.end+'秒] '+s.text).join('\n')+'\n\n请输出：\n1. 一句话概述：这段主播在讲什么。\n2. 逐段中文翻译（格式：[开始-结束秒] 中文译文）。\n只输出翻译，不要解释，不要编造原文没有的内容。';
+      const p='请把下面这段直播话术逐段翻译成中文（源语言可能是泰语/马来语/越南语/印尼语/菲律宾语/英语，请自动识别），保持分段与时间戳对应。\n\n【识别结果（含时间戳）】\n'+segs.map(s=>'['+s.start+'-'+s.end+'秒] '+s.text).join('\n')+'\n\n请输出：\n1. 一句话概述：这段主播在讲什么。\n2. 逐段中文翻译（格式：[开始-结束秒] 中文译文）。\n只输出翻译，不要解释，不要编造原文没有的内容。';
       const r=await callDeepSeek(p, 4000);
       if(r.err){ transHtml='<div class="callout amber"><b>翻译失败</b>'+r.err+'</div>'; }
       else { zhText=r.text; transHtml=mdToHtml(r.text); }
