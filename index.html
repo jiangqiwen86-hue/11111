@@ -707,6 +707,64 @@ function rankOf(metric, value){
   return 50;
 }
 
+// ============ 逐日明细筛选卡片（admin / 名下多店 / 店长看板共用） ============
+function dailyFilterCard(stores){
+  const dMin=DATA.date_range.min, dMax=DATA.date_range.max;
+  const dEnd=new Date(dMax+'T00:00:00');
+  let dDefStart=(new Date(dEnd.getTime()-29*86400000)).toISOString().slice(0,10);
+  if(dDefStart<dMin) dDefStart=dMin;
+  const quick=[['today','今天'],['yesterday','昨天'],['7d','最近7天'],['30d','最近30天'],['60d','最近60天'],['month','本月'],['lastmonth','上月'],['all','全部']];
+  return `
+  <div class="card" style="border:1px solid #6366f1">
+    <h3><span class="dot" style="background:#6366f1"></span>按时间段 + 店铺查看逐日数据明细</h3>
+    <div class="desc">选择起止日期和店铺（或点快捷选项），查看对应时间段内的逐日数据明细与区间汇总</div>
+    <div class="btn-row" style="margin-bottom:8px;flex-wrap:wrap;align-items:center;gap:6px">
+      <label style="font-size:13px;color:var(--dim)">开始日期</label>
+      <input type="date" class="inp" id="mmDateStart" value="${dDefStart}" min="${dMin}" max="${dMax}" style="max-width:150px">
+      <label style="font-size:13px;color:var(--dim)">结束日期</label>
+      <input type="date" class="inp" id="mmDateEnd" value="${dMax}" min="${dMin}" max="${dMax}" style="max-width:150px">
+      <label style="font-size:13px;color:var(--dim)">店铺</label>
+      <select class="sel" id="mmStore" style="max-width:300px">
+        ${stores.map(s=>`<option value="${s.store}">${s.store}（${s.country}·${s.cat}）</option>`).join('')}
+      </select>
+      <button class="btn" onclick="renderMultiDetail()">🔍 搜索</button>
+      <button class="btn ghost" onclick="mmReset()">重置</button>
+    </div>
+    <div class="btn-row" style="margin-bottom:12px;flex-wrap:wrap;gap:6px">
+      ${quick.map(q=>`<button class="btn ghost" style="padding:4px 12px;font-size:12px" onclick="mmQuick('${q[0]}')">${q[1]}</button>`).join('')}
+    </div>
+    <div id="multiDetail"></div>
+  </div>`;
+}
+function _mmShift(days){ const end=new Date(DATA.date_range.max+'T00:00:00'); const s=new Date(end.getTime()-(days-1)*86400000); let v=s.toISOString().slice(0,10); if(v<DATA.date_range.min) v=DATA.date_range.min; return v; }
+function mmQuick(type){
+  const sEl=document.getElementById('mmDateStart'), eEl=document.getElementById('mmDateEnd');
+  if(!sEl||!eEl) return;
+  const dMax=DATA.date_range.max;
+  let s=DATA.date_range.min, e=dMax;
+  if(type==='today'){ s=dMax; }
+  else if(type==='yesterday'){ s=_mmShift(2); e=_mmShift(2); }
+  else if(type==='7d'){ s=_mmShift(7); }
+  else if(type==='30d'){ s=_mmShift(30); }
+  else if(type==='60d'){ s=_mmShift(60); }
+  else if(type==='month'){ s=dMax.slice(0,8)+'01'; }
+  else if(type==='lastmonth'){
+    const y=+dMax.slice(0,4), m=+dMax.slice(5,7);
+    const lm=(m===1)?12:m-1, ly=(m===1)?y-1:y;
+    s=ly+'-'+String(lm).padStart(2,'0')+'-01';
+    e=ly+'-'+String(lm).padStart(2,'0')+'-'+String(new Date(ly,lm,0).getDate()).padStart(2,'0');
+    if(e>dMax) e=dMax;
+  }
+  sEl.value=s; eEl.value=e;
+  renderMultiDetail();
+}
+function mmReset(){
+  const sEl=document.getElementById('mmDateStart'), eEl=document.getElementById('mmDateEnd');
+  if(sEl) sEl.value=DATA.date_range.min;
+  if(eEl) eEl.value=DATA.date_range.max;
+  renderMultiDetail();
+}
+
 // ================= 视图1：数据看板 =================
 function viewDashboard(){
   const mc=document.getElementById('mainContent');
@@ -764,6 +822,8 @@ ${DATA.classification.country.map(c=>'- '+c.country+'：'+c.n+'家，直播GMV '
     ${kpi('新关注量', fmtInt(aug.follow), aug.mom_follow, false)}
     ${kpi('平均客单价', fmtWan(aug.avg_aov), aug.mom_avg_aov, false)}
   </div>
+
+  ${dailyFilterCard(STORES)}
 
   <div class="grid g2">
     <div class="card"><h3><span class="dot"></span>直播 GMV 与店铺 GMV 趋势</h3>
@@ -833,6 +893,7 @@ ${DATA.classification.country.map(c=>'- '+c.country+'：'+c.n+'家，直播GMV '
 
   const rows=[['店铺数（家）',S.map(x=>x.n)],['直播GMV',S.map(x=>fmtWan(x.gmv))],['店铺GMV',S.map(x=>fmtWan(x.store_gmv))],['直播业绩占比',S.map(x=>x.ratio+'%')],['直播总场次',S.map(x=>fmtInt(x.sess))],['直播总时长(小时)',S.map(x=>fmtInt(x.hours))],['场均GMV',S.map(x=>fmtWan(x.avg_gmv))],['支付订单量',S.map(x=>fmtInt(x.orders))],['新关注量',S.map(x=>fmtInt(x.follow))],['平均PCR',S.map(x=>x.avg_pcr+'%')],['平均CTR',S.map(x=>x.avg_ctr+'%')],['平均观看时长(秒)',S.map(x=>x.avg_watch)],['平均客单价',S.map(x=>fmtWan(x.avg_aov))]];
   document.getElementById('dashMonthRows').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td class="tnum">${r[1][0]}</td><td class="tnum">${r[1][1]}</td><td class="tnum">${r[1][2]}</td><td class="tnum">${momBadge(S[2]['mom_'+{ '店铺数（家）':'n','直播GMV':'gmv','店铺GMV':'store_gmv','直播业绩占比':'ratio','直播总场次':'sess','直播总时长(小时)':'hours','场均GMV':'avg_gmv','支付订单量':'orders','新关注量':'follow','平均PCR':'avg_pcr','平均CTR':'avg_ctr','平均观看时长(秒)':'avg_watch','平均客单价':'avg_aov'}[r[0]]])}</td></tr>`).join('');
+  setTimeout(()=>{ renderMultiDetail(); },0);
 }
 function kpi(lbl,val,mom,accent){ return `<div class="kpi"><div class="lbl">${lbl}</div><div class="val ${accent?'accent':''}">${val}</div>${momBadge(mom)}</div>`; }
 
@@ -935,18 +996,22 @@ ${myRank.map((r,i)=>(i+1)+'. '+r.store+'（'+(r.country||'')+'·'+(r.cat||'')+'�
   </div>
 
   <div class="card" style="border:1px solid #6366f1">
-    <h3><span class="dot" style="background:#6366f1"></span>按日期 + 店铺查看逐日数据明细</h3>
-    <div class="desc">选择起止日期和名下店铺，查看该店铺对应时间段内的逐日数据明细（达标线 P50 ／ 优秀线 P75 前25% 为月大盘口径，单店复盘仍可看月分位）</div>
-    <div class="btn-row" style="margin-bottom:12px;flex-wrap:wrap;align-items:center">
+    <h3><span class="dot" style="background:#6366f1"></span>按时间段 + 店铺查看逐日数据明细</h3>
+    <div class="desc">选择起止日期和店铺（或点快捷选项），查看对应时间段内的逐日数据明细与区间汇总</div>
+    <div class="btn-row" style="margin-bottom:8px;flex-wrap:wrap;align-items:center;gap:6px">
       <label style="font-size:13px;color:var(--dim)">开始日期</label>
       <input type="date" class="inp" id="mmDateStart" value="${dDefStart}" min="${dMin}" max="${dMax}" style="max-width:150px">
       <label style="font-size:13px;color:var(--dim)">结束日期</label>
-      <input type="date" class="inp" id="mmDateEnd" value="${dDefEnd}" min="${dMin}" max="${dMax}" style="max-width:150px">
+      <input type="date" class="inp" id="mmDateEnd" value="${dMax}" min="${dMin}" max="${dMax}" style="max-width:150px">
       <label style="font-size:13px;color:var(--dim)">店铺</label>
       <select class="sel" id="mmStore" style="max-width:300px">
         ${myStores.map(s=>`<option value="${s.store}">${s.store}（${s.country}·${s.cat}）</option>`).join('')}
       </select>
-      <button class="btn" onclick="renderMultiDetail()">查看明细</button>
+      <button class="btn" onclick="renderMultiDetail()">🔍 搜索</button>
+      <button class="btn ghost" onclick="mmReset()">重置</button>
+    </div>
+    <div class="btn-row" style="margin-bottom:12px;flex-wrap:wrap;gap:6px">
+      ${[['today','今天'],['yesterday','昨天'],['7d','最近7天'],['30d','最近30天'],['60d','最近60天'],['month','本月'],['lastmonth','上月'],['all','全部']].map(q=>`<button class="btn ghost" style="padding:4px 12px;font-size:12px" onclick="mmQuick('${q[0]}')">${q[1]}</button>`).join('')}
     </div>
     <div id="multiDetail"></div>
   </div>
@@ -1165,6 +1230,8 @@ ${[['直播GMV','gmv'],['场均GMV','avg_gmv'],['支付转化率PCR','pcr'],['�
 
   ${storeBlock()}
 
+  ${dailyFilterCard([s])}
+
   <div class="grid g2">
     <div class="card"><h3><span class="dot" style="background:#6366f1"></span>我的直播 GMV 周期趋势</h3>
       <div class="desc">${months.map(monLabel).join(' / ')} 直播GMV走势</div>
@@ -1186,6 +1253,7 @@ ${[['直播GMV','gmv'],['场均GMV','avg_gmv'],['支付转化率PCR','pcr'],['�
   setTimeout(()=>{
     const g=document.getElementById('sgGmv'); if(g) barChart(g,[{name:'直播GMV',color:'#ff5a7d',data:mSeq('gmv')}],{labels:months.map(monLabel)});
     const c=document.getElementById('sgCvr'); if(c) lineChart(c,[{name:'PCR',color:'#ff5a7d',data:mSeq('pcr')},{name:'CTR',color:'#a78bfa',data:mSeq('ctr')},{name:'观看时长',color:'#10b981',data:mSeq('watch')}],{labels:months.map(monLabel)});
+    renderMultiDetail();
   },0);
 }
 function renderFunnel2(el, items){
