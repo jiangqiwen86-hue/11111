@@ -894,6 +894,11 @@ function viewMultiDashboard(mc){
   const myWatch = myRank.filter(r=>r.cls==='观察');
   const totalGmv = myRank.reduce((s,r)=>s+(r.gmv||0),0);
   const roleName = ROLE_LABEL[session.role]||session.role;
+  const monLabel=m=>m.length>4?m.slice(5)+'月':m;
+
+  // 名下店铺（有直播数据的），按店名排序
+  const myStores = Object.keys(DATA.store_series).filter(s=>canSeeStore(s)).map(s=>DATA.store_series[s]).sort((a,b)=>a.store.localeCompare(b.store));
+  const months = DATA.months.slice().sort();
 
   window._export = { title:'我名下店铺看板_'+new Date().toISOString().slice(0,10), md:
 `# 我名下店铺数据看板 · ${session.title||roleName}
@@ -923,6 +928,23 @@ ${myRank.map((r,i)=>(i+1)+'. '+r.store+'（'+(r.country||'')+'·'+(r.cat||'')+'�
     ${kpi('名下GMV', fmtWan(totalGmv), null, true)}
   </div>
 
+  <div class="card" style="border:1px solid #6366f1">
+    <h3><span class="dot" style="background:#6366f1"></span>按月份 + 店铺查看数据明细</h3>
+    <div class="desc">选择月份和名下店铺，查看该店铺对应时间内的完整数据明细与大盘分位（达标线 P50 ／ 优秀线 P75 前25%）</div>
+    <div class="btn-row" style="margin-bottom:12px;flex-wrap:wrap;align-items:center">
+      <label style="font-size:13px;color:var(--dim)">月份</label>
+      <select class="sel" id="mmMonth" style="max-width:150px">
+        ${months.map(m=>`<option value="${m}" ${m===months[months.length-1]?'selected':''}>${monLabel(m)}${m==='2026-09'?'(进行中)':''}</option>`).join('')}
+      </select>
+      <label style="font-size:13px;color:var(--dim)">店铺</label>
+      <select class="sel" id="mmStore" style="max-width:300px">
+        ${myStores.map(s=>`<option value="${s.store}">${s.store}（${s.country}·${s.cat}）</option>`).join('')}
+      </select>
+      <button class="btn" onclick="renderMultiDetail()">查看明细</button>
+    </div>
+    <div id="multiDetail"></div>
+  </div>
+
   <div class="card">
     <h3><span class="dot"></span>名下店铺列表（${myRank.length}）</h3>
     <div class="desc">按健康度排序</div>
@@ -937,6 +959,93 @@ ${myRank.map((r,i)=>(i+1)+'. '+r.store+'（'+(r.country||'')+'·'+(r.cat||'')+'�
       </tbody></table></div>
   </div>
   <div class="footer-note">数据范围仅限我名下店铺 · LiveOps Console</div>`;
+
+  setTimeout(()=>{ renderMultiDetail(); }, 0);
+}
+
+// 名下多店：按「月份 + 店铺」渲染完整数据明细
+function renderMultiDetail(){
+  const el=document.getElementById('multiDetail'); if(!el) return;
+  const monthSel=document.getElementById('mmMonth');
+  const storeSel=document.getElementById('mmStore');
+  if(!monthSel||!storeSel) return;
+  const month=monthSel.value, store=storeSel.value;
+  const s=DATA.store_series[store];
+  const m=s?s.months[month]:null;
+  if(!s||!m){ el.innerHTML='<div class="callout amber"><b>暂无数据</b>该店铺在所选月份暂无数据明细。</div>'; return; }
+  const gpm=m.viewers>0?m.gmv/m.viewers*1000:null;
+  const uv=m.viewers>0?m.gmv/m.viewers:null;
+  const zf=m.viewers>0?m.follow/m.viewers*100:null;
+  const prevMonths=Object.keys(s.months).filter(k=>k<month).sort();
+  const momOf=k=>{ if(!prevMonths.length) return null; const p=s.months[prevMonths[prevMonths.length-1]][k]; const c=m[k]; return c==null||!p?null:Math.round((c-p)/p*1000)/10; };
+  const monLabel=m2=>m2.length>4?m2.slice(5)+'月':m2;
+  el.innerHTML=`
+    <div class="h-sub" style="margin:4px 0 12px">📅 ${s.store} · ${monLabel(month)}（${s.country} · ${s.cat}${s.manager&&s.manager!=='—'?' · 店长 '+s.manager:''}）</div>
+    <div class="grid g4" style="margin-bottom:12px">
+      ${kpi('直播GMV', fmtWan(m.gmv), momOf('gmv'), true)}
+      ${kpi('场均GMV', fmtWan(m.avg_gmv), momOf('avg_gmv'), false)}
+      ${kpi('支付转化率PCR', m.pcr!=null?m.pcr+'%':'—', momOf('pcr'), false)}
+      ${kpi('平均观看时长', m.watch!=null?m.watch+'秒':'—', momOf('watch'), false)}
+      ${kpi('千次观看GPM', gpm!=null?Math.round(gpm)+'元':'—', null, false)}
+      ${kpi('UV价值', uv!=null?(+uv).toFixed(2)+'元':'—', null, false)}
+      ${kpi('转粉率', zf!=null?(+zf).toFixed(1)+'%':'—', null, false)}
+      ${kpi('客单价', fmtWan(m.aov), momOf('aov'), false)}
+    </div>
+    ${multiDetailTable(m)}
+  `;
+}
+
+// 名下多店明细表：完整字段 + 大盘达标线P50/优秀线P75 + 本店分位
+function multiDetailTable(m){
+  const b=DATA.benchmark;
+  const gpm=m.viewers>0?m.gmv/m.viewers*1000:null;
+  const uv=m.viewers>0?m.gmv/m.viewers:null;
+  const zf=m.viewers>0?m.follow/m.viewers*100:null;
+  const hours=m.sec?Math.round(m.sec/3600):null;
+  const fmt=(v,t)=>{
+    if(v==null) return '—';
+    switch(t){
+      case 'wan': return fmtWan(v);
+      case 'pct': return (+v).toFixed(2)+'%';
+      case 'int': return fmtInt(v);
+      case 'sec': return Math.round(v)+'秒';
+      case 'hour': return v+'小时';
+      case 'gpm': return Math.round(v)+'元';
+      case 'uv': return (+v).toFixed(2)+'元';
+      case 'zf': return (+v).toFixed(1)+'%';
+      default: return String(v);
+    }
+  };
+  const defs=[
+    ['直播GMV','gmv',m.gmv,'wan'],
+    ['店铺GMV',null,m.store_gmv,'wan'],
+    ['直播业绩占比','ratio',m.ratio,'pct'],
+    ['直播场次','sess',m.sess,'int'],
+    ['直播总时长',null,hours,'hour'],
+    ['场均GMV','avg_gmv',m.avg_gmv,'wan'],
+    ['小时GMV','hour_gmv',m.hour_gmv,'wan'],
+    ['支付转化率PCR','pcr',m.pcr,'pct'],
+    ['成交转化率CVR','cvr',m.cvr,'pct'],
+    ['商品点击率CTR','ctr',m.ctr,'pct'],
+    ['平均观看时长','watch',m.watch,'sec'],
+    ['新关注量','follow',m.follow,'int'],
+    ['客单价','aov',m.aov,'wan'],
+    ['曝光量','exposure',m.exposure,'int'],
+    ['观看人数','viewers',m.viewers,'int'],
+    ['支付订单','orders',m.orders,'int'],
+    ['千次观看成交GPM',null,gpm,'gpm'],
+    ['UV价值',null,uv,'uv'],
+    ['转粉率',null,zf,'zf'],
+  ];
+  return `<div class="tbl-wrap"><table><thead><tr><th>指标</th><th class="tnum">本店数值</th><th class="tnum">大盘达标线(P50)</th><th class="tnum">大盘优秀线(P75)</th><th class="tnum">本店分位</th></tr></thead><tbody>
+  ${defs.map(([name,key,v,t])=>{
+    const p50=(key&&b[key])?fmt(b[key].p50,t):'—';
+    const p75=(key&&b[key])?fmt(b[key].p75,t):'—';
+    const r=key?rankOf(key,v):null;
+    const rc=r!=null?(r>=75?'b-green':(r>=50?'b-cyan':(r>=25?'b-amber':'b-red'))):'b-dim';
+    return `<tr><td>${name}</td><td class="tnum"><b>${fmt(v,t)}</b></td><td class="tnum">${p50}</td><td class="tnum">${p75}</td><td class="tnum"><span class="badge ${rc}">${r!=null?Math.round(r)+'%':'—'}</span></td></tr>`;
+  }).join('')}
+  </tbody></table></div>`;
 }
 function viewStoreDashboard(mc){
   const s = DATA.store_series[myStore()];
