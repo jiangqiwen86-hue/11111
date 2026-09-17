@@ -930,10 +930,14 @@ ${myRank.map((r,i)=>(i+1)+'. '+r.store+'（'+(r.country||'')+'·'+(r.cat||'')+'�
 
   <div class="card" style="border:1px solid #6366f1">
     <h3><span class="dot" style="background:#6366f1"></span>按月份 + 店铺查看数据明细</h3>
-    <div class="desc">选择月份和名下店铺，查看该店铺对应时间内的完整数据明细与大盘分位（达标线 P50 ／ 优秀线 P75 前25%）</div>
+    <div class="desc">选择起止月份和名下店铺，查看该店铺对应时间段内的数据明细与大盘分位（达标线 P50 ／ 优秀线 P75 前25%）</div>
     <div class="btn-row" style="margin-bottom:12px;flex-wrap:wrap;align-items:center">
-      <label style="font-size:13px;color:var(--dim)">月份</label>
-      <select class="sel" id="mmMonth" style="max-width:150px">
+      <label style="font-size:13px;color:var(--dim)">开始月</label>
+      <select class="sel" id="mmMonthStart" style="max-width:130px">
+        ${months.map(m=>`<option value="${m}" ${m===months[months.length-1]?'selected':''}>${monLabel(m)}${m==='2026-09'?'(进行中)':''}</option>`).join('')}
+      </select>
+      <label style="font-size:13px;color:var(--dim)">结束月</label>
+      <select class="sel" id="mmMonthEnd" style="max-width:130px">
         ${months.map(m=>`<option value="${m}" ${m===months[months.length-1]?'selected':''}>${monLabel(m)}${m==='2026-09'?'(进行中)':''}</option>`).join('')}
       </select>
       <label style="font-size:13px;color:var(--dim)">店铺</label>
@@ -963,36 +967,101 @@ ${myRank.map((r,i)=>(i+1)+'. '+r.store+'（'+(r.country||'')+'·'+(r.cat||'')+'�
   setTimeout(()=>{ renderMultiDetail(); }, 0);
 }
 
-// 名下多店：按「月份 + 店铺」渲染完整数据明细
+// 名下多店：按「起止月份 + 店铺」渲染数据明细（单月=完整明细；跨月=区间汇总+逐月明细）
 function renderMultiDetail(){
   const el=document.getElementById('multiDetail'); if(!el) return;
-  const monthSel=document.getElementById('mmMonth');
+  const sSel=document.getElementById('mmMonthStart'), eSel=document.getElementById('mmMonthEnd');
   const storeSel=document.getElementById('mmStore');
-  if(!monthSel||!storeSel) return;
-  const month=monthSel.value, store=storeSel.value;
+  if(!sSel||!eSel||!storeSel) return;
+  const store=storeSel.value;
   const s=DATA.store_series[store];
-  const m=s?s.months[month]:null;
-  if(!s||!m){ el.innerHTML='<div class="callout amber"><b>暂无数据</b>该店铺在所选月份暂无数据明细。</div>'; return; }
-  const gpm=m.viewers>0?m.gmv/m.viewers*1000:null;
-  const uv=m.viewers>0?m.gmv/m.viewers:null;
-  const zf=m.viewers>0?m.follow/m.viewers*100:null;
-  const prevMonths=Object.keys(s.months).filter(k=>k<month).sort();
-  const momOf=k=>{ if(!prevMonths.length) return null; const p=s.months[prevMonths[prevMonths.length-1]][k]; const c=m[k]; return c==null||!p?null:Math.round((c-p)/p*1000)/10; };
+  if(!s){ el.innerHTML='<div class="callout amber"><b>暂无数据</b>该店铺暂无数据明细。</div>'; return; }
+  let ms=sSel.value, me=eSel.value;
+  if(ms>me){ const t=ms; ms=me; me=t; }
+  const allMonths=Object.keys(s.months).sort();
+  const range=allMonths.filter(m=>m>=ms&&m<=me);
+  if(!range.length){ el.innerHTML='<div class="callout amber"><b>暂无数据</b>该店铺在所选时间范围内暂无数据明细。</div>'; return; }
+  // 派生指标统一取值（gpm/uv/转粉率 从基础字段现算，其余直取）
+  const derive=(mm,k)=>{
+    if(k==='gpm') return mm.viewers>0?mm.gmv/mm.viewers*1000:null;
+    if(k==='uv') return mm.viewers>0?mm.gmv/mm.viewers:null;
+    if(k==='zf') return mm.viewers>0?mm.follow/mm.viewers*100:null;
+    return mm[k];
+  };
   const monLabel=m2=>m2.length>4?m2.slice(5)+'月':m2;
-  el.innerHTML=`
-    <div class="h-sub" style="margin:4px 0 12px">📅 ${s.store} · ${monLabel(month)}（${s.country} · ${s.cat}${s.manager&&s.manager!=='—'?' · 店长 '+s.manager:''}）</div>
+  const head=`<div class="h-sub" style="margin:4px 0 12px">📅 ${s.store} · ${range.length===1?monLabel(range[0]):monLabel(range[0])+' ~ '+monLabel(range[range.length-1])}（${s.country} · ${s.cat}${s.manager&&s.manager!=='—'?' · 店长 '+s.manager:''}）</div>`;
+
+  if(range.length===1){
+    const month=range[0], m=s.months[month];
+    const prevKey=allMonths.filter(k=>k<month).pop();
+    const momOf=k=>{ if(!prevKey) return null; const c=derive(m,k), p=derive(s.months[prevKey],k); return c==null||!p?null:Math.round((c-p)/p*1000)/10; };
+    const gpm=derive(m,'gpm'), uv=derive(m,'uv'), zf=derive(m,'zf');
+    el.innerHTML=head+`
     <div class="grid g4" style="margin-bottom:12px">
       ${kpi('直播GMV', fmtWan(m.gmv), momOf('gmv'), true)}
       ${kpi('场均GMV', fmtWan(m.avg_gmv), momOf('avg_gmv'), false)}
       ${kpi('支付转化率PCR', m.pcr!=null?m.pcr+'%':'—', momOf('pcr'), false)}
       ${kpi('平均观看时长', m.watch!=null?m.watch+'秒':'—', momOf('watch'), false)}
-      ${kpi('千次观看GPM', gpm!=null?Math.round(gpm)+'元':'—', null, false)}
-      ${kpi('UV价值', uv!=null?(+uv).toFixed(2)+'元':'—', null, false)}
-      ${kpi('转粉率', zf!=null?(+zf).toFixed(1)+'%':'—', null, false)}
+      ${kpi('千次观看GPM', gpm!=null?Math.round(gpm)+'元':'—', momOf('gpm'), false)}
+      ${kpi('UV价值', uv!=null?(+uv).toFixed(2)+'元':'—', momOf('uv'), false)}
+      ${kpi('转粉率', zf!=null?(+zf).toFixed(1)+'%':'—', momOf('zf'), false)}
       ${kpi('客单价', fmtWan(m.aov), momOf('aov'), false)}
     </div>
     ${multiDetailTable(m)}
-  `;
+    `;
+  } else {
+    const sum=k=>range.reduce((t,mo)=>t+(s.months[mo][k]||0),0);
+    const avgOf=k=>{ const vs=range.map(mo=>s.months[mo][k]).filter(v=>v!=null); return vs.length?(vs.reduce((a,b)=>a+b,0)/vs.length):null; };
+    const gmv=sum('gmv'), viewers=sum('viewers'), orders=sum('orders'), follow=sum('follow'), sess=sum('sess'), sec=sum('sec'), storeGmv=sum('store_gmv');
+    const gpm=viewers>0?gmv/viewers*1000:null;
+    const uv=viewers>0?gmv/viewers:null;
+    const zf=viewers>0?follow/viewers*100:null;
+    const avgGmv=sess>0?gmv/sess:null;
+    const aov=orders>0?gmv/orders:null;
+    // 区间环比：与紧邻的上一等长区间比较
+    const idx0=allMonths.indexOf(range[0]);
+    const prevRange=(idx0>=range.length)?allMonths.slice(idx0-range.length, idx0):null;
+    let momG=null, momGpm=null;
+    if(prevRange&&prevRange.length===range.length&&prevRange.every(mo=>s.months[mo])){
+      const pg=prevRange.reduce((t,mo)=>t+(s.months[mo].gmv||0),0);
+      const pv=prevRange.reduce((t,mo)=>t+(s.months[mo].viewers||0),0);
+      const pGpm=pv>0?pg/pv*1000:null;
+      momG=(pg>0)?Math.round((gmv-pg)/pg*1000)/10:null;
+      momGpm=(pGpm&&gpm!=null)?Math.round((gpm-pGpm)/pGpm*1000)/10:null;
+    }
+    el.innerHTML=head+`
+    <div class="grid g4" style="margin-bottom:12px">
+      ${kpi('区间直播GMV', fmtWan(gmv), momG, true)}
+      ${kpi('区间场均GMV', fmtWan(avgGmv), null, false)}
+      ${kpi('区间GPM', gpm!=null?Math.round(gpm)+'元':'—', momGpm, false)}
+      ${kpi('区间UV价值', uv!=null?(+uv).toFixed(2)+'元':'—', null, false)}
+      ${kpi('区间转粉率', zf!=null?(+zf).toFixed(1)+'%':'—', null, false)}
+      ${kpi('区间客单价', fmtWan(aov), null, false)}
+      ${kpi('区间场次', fmtInt(sess), null, false)}
+      ${kpi('区间订单', fmtInt(orders), null, false)}
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>月份</th><th class="tnum">直播GMV</th><th class="tnum">场次</th><th class="tnum">场均GMV</th><th class="tnum">PCR</th><th class="tnum">CTR</th><th class="tnum">观看时长</th><th class="tnum">GPM</th><th class="tnum">UV价值</th><th class="tnum">转粉率</th><th class="tnum">订单</th><th class="tnum">新关注</th><th>操作</th></tr></thead>
+      <tbody>
+      ${range.map(mo=>{ const mm=s.months[mo]; const g2=mm.viewers>0?mm.gmv/mm.viewers*1000:null; const u2=mm.viewers>0?mm.gmv/mm.viewers:null; const z2=mm.viewers>0?mm.follow/mm.viewers*100:null;
+        return `<tr><td><b>${monLabel(mo)}${mo==='2026-09'?'(进行中)':''}</b></td>
+        <td class="tnum">${fmtWan(mm.gmv)}</td><td class="tnum">${fmtInt(mm.sess)}</td><td class="tnum">${fmtWan(mm.avg_gmv)}</td>
+        <td class="tnum">${mm.pcr!=null?mm.pcr+'%':'—'}</td><td class="tnum">${mm.ctr!=null?mm.ctr+'%':'—'}</td><td class="tnum">${mm.watch!=null?Math.round(mm.watch)+'秒':'—'}</td>
+        <td class="tnum">${g2!=null?Math.round(g2)+'元':'—'}</td><td class="tnum">${u2!=null?(+u2).toFixed(2)+'元':'—'}</td><td class="tnum">${z2!=null?(+z2).toFixed(1)+'%':'—'}</td>
+        <td class="tnum">${fmtInt(mm.orders)}</td><td class="tnum">${fmtInt(mm.follow)}</td>
+        <td><button class="btn ghost" style="padding:2px 10px;font-size:12px" onclick="mmFocus('${mo}')">查看该月</button></td></tr>`; }).join('')}
+      </tbody></table></div>
+    <div class="hint" style="margin-top:8px">区间口径：GMV/订单/观看/关注/场次为区间求和；GPM/UV价值/转粉率/场均GMV/客单价按区间整体重算；PCR/CTR/观看时长为区间月均值。点「查看该月」看单月完整明细。</div>
+    `;
+  }
+}
+
+// 逐月明细表里点「查看该月」：起止月都设为该月，渲染单月完整明细
+function mmFocus(mo){
+  const sEl=document.getElementById('mmMonthStart'), eEl=document.getElementById('mmMonthEnd');
+  if(sEl) sEl.value=mo;
+  if(eEl) eEl.value=mo;
+  renderMultiDetail();
 }
 
 // 名下多店明细表：完整字段 + 大盘达标线P50/优秀线P75 + 本店分位
