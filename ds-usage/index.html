@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek 用量测试工具</title>
+<style>
+  :root{
+    --brand:#4D6BFE;
+    --brand-deep:#3b54d6;
+    --ink:#1a1d2b;
+    --ink-2:#5b6178;
+    --ink-3:#9aa0b5;
+    --line:#eceef4;
+    --bg:#f6f7fb;
+    --card:#ffffff;
+    --ok:#16a34a;
+    --ok-bg:#e7f7ee;
+    --warn:#d97706;
+    --warn-bg:#fdf3e3;
+    --err:#dc2626;
+    --err-bg:#fdeaea;
+    --peak:#dc2626;
+    --offpeak:#16a34a;
+    --shadow:0 6px 24px rgba(28,34,64,.06);
+    --shadow-hover:0 10px 32px rgba(28,34,64,.10);
+    --radius:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;
+    background:linear-gradient(180deg,#eef1fb 0%,#f6f7fb 220px);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    padding:32px 20px 64px;
+  }
+  .wrap{max-width:1040px;margin:0 auto}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#4D6BFE,#7b5cff);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px;box-shadow:0 6px 18px rgba(77,107,254,.35)}
+  .brand h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
+  .brand p{font-size:13px;color:var(--ink-2);margin-top:2px}
+  .statusbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--ink-2);box-shadow:var(--shadow)}
+  .chip .dot{width:8px;height:8px;border-radius:50%}
+  .chip.peak .dot{background:var(--peak);box-shadow:0 0 0 3px rgba(220,38,38,.15)}
+  .chip.offpeak .dot{background:var(--offpeak);box-shadow:0 0 0 3px rgba(22,163,74,.15)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px 24px;margin-bottom:18px;transition:box-shadow .2s}
+  .card:hover{box-shadow:var(--shadow-hover)}
+  .card h2{font-size:15px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .card h2 .ico{font-size:17px}
+  .card .sub{font-size:12.5px;color:var(--ink-3);margin-bottom:16px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  input[type=password],input[type=text],input[type=number]{
+    flex:1;min-width:220px;padding:11px 14px;border:1px solid var(--line);border-radius:10px;
+    font-size:14px;font-family:inherit;color:var(--ink);background:#fbfbfe;outline:none;transition:border .15s,box-shadow .15s;
+  }
+  input:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(77,107,254,.12)}
+  button{
+    border:none;cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:600;border-radius:10px;
+    padding:11px 18px;transition:transform .06s,opacity .15s,box-shadow .15s;white-space:nowrap;
+  }
+  button:active{transform:translateY(1px)}
+  .btn-primary{background:linear-gradient(135deg,#4D6BFE,#6a5cf5);color:#fff;box-shadow:0 6px 16px rgba(77,107,254,.32)}
+  .btn-primary:hover{box-shadow:0 8px 22px rgba(77,107,254,.42)}
+  .btn-ghost{background:#f1f3f9;color:var(--ink-2)}
+  .btn-ghost:hover{background:#e8ebf4}
+  .btn-danger{background:var(--err-bg);color:var(--err)}
+  button:disabled{opacity:.55;cursor:not-allowed}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+  .stat{background:#fafbfe;border:1px solid var(--line);border-radius:12px;padding:16px}
+  .stat .label{font-size:12px;color:var(--ink-3);margin-bottom:6px}
+  .stat .val{font-size:24px;font-weight:700;letter-spacing:-.5px}
+  .stat .val.small{font-size:18px}
+  .stat .note{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+  .val.ok{color:var(--ok)} .val.err{color:var(--err)} .val.warn{color:var(--warn)}
+  .banner{border-radius:12px;padding:13px 16px;font-size:13px;line-height:1.6;margin-bottom:14px}
+  .banner.err{background:var(--err-bg);color:#a11d1d}
+  .banner.ok{background:var(--ok-bg);color:#136a35}
+  .banner.warn{background:var(--warn-bg);color:#8a5a10}
+  .banner.info{background:#eef1fb;color:#3b54d6}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line)}
+  th{font-size:12px;color:var(--ink-3);font-weight:600;background:#fafbfe}
+  td.mono{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12.5px}
+  .model-btn{background:#fff;border:1px solid var(--line);color:var(--ink);padding:10px 16px;border-radius:10px;font-size:13px;display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left}
+  .model-btn .mname{font-weight:700}
+  .model-btn .mdesc{font-size:11px;color:var(--ink-3);font-weight:400}
+  .model-btn.active{border-color:var(--brand);box-shadow:0 0 0 3px rgba(77,107,254,.12);background:#f6f8ff}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:6px;vertical-align:middle}
+  .tag.peak{background:var(--err-bg);color:var(--err)}
+  .tag.offpeak{background:var(--ok-bg);color:var(--ok)}
+  .tag.legacy{background:#f1f3f9;color:var(--ink-3)}
+  .log{max-height:260px;overflow:auto;background:#0f1220;border-radius:12px;padding:14px 16px;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;color:#c9d1f0;line-height:1.7}
+  .log .ts{color:#5b668c}
+  .log .ok{color:#4ade80} .log .err{color:#f87171} .log .info{color:#7dd3fc}
+  .hint{font-size:12px;color:var(--ink-3);line-height:1.6}
+  a{color:var(--brand);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .divider{height:1px;background:var(--line);margin:18px 0}
+  .kbd{font-family:"SF Mono",Menlo,monospace;font-size:12px;background:#f1f3f9;padding:2px 7px;border-radius:6px}
+  footer{text-align:center;color:var(--ink-3);font-size:12px;margin-top:28px}
+  @media(max-width:640px){.stat .val{font-size:20px}.card{padding:18px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="logo">DS</div>
+      <div>
+        <h1>DeepSeek 用量测试工具</h1>
+        <p>余额查询 · 模型连通性 · Token 计量 · 成本换算</p>
+      </div>
+    </div>
+    <div class="statusbar">
+      <span class="chip" id="chipPeak"><span class="dot"></span><span id="chipPeakText">计算中…</span></span>
+      <span class="chip" id="chipUtc">UTC <span id="utcTime">--:--</span></span>
+      <span class="chip" id="chipUsd">USD/CNY <span id="usdRate" contenteditable="false">7.20</span></span>
+    </div>
+  </header>
+
+  <!-- API Key -->
+  <div class="card">
+    <h2><span class="ico">🔑</span>API Key 配置</h2>
+    <div class="sub">粘贴 DeepSeek 开放平台的 API Key（sk-开头）。仅保存在你的浏览器本地，不会上传到任何服务器。</div>
+    <div class="row">
+      <input type="password" id="apiKey" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+      <button class="btn-ghost" id="btnToggle" onclick="toggleKey()">显示</button>
+      <button class="btn-primary" onclick="saveKey()">保存</button>
+      <button class="btn-danger" onclick="clearKey()">清除</button>
+    </div>
+  </div>
+
+  <!-- 余额 -->
+  <div class="card">
+    <h2><span class="ico">💰</span>账户余额</h2>
+    <div class="sub">调用官方 <span class="kbd">GET /user/balance</span> 接口实时查询（CNY）。</div>
+    <div class="row" style="margin-bottom:16px">
+      <button class="btn-primary" id="btnBalance" onclick="queryBalance()">查询余额</button>
+      <button class="btn-ghost" onclick="runAllTests()">一键全测（余额 + 连通性）</button>
+    </div>
+    <div id="balanceArea"><div class="hint">尚未查询。填入 Key 后点击「查询余额」。</div></div>
+  </div>
+
+  <!-- 连通性测试 -->
+  <div class="card">
+    <h2><span class="ico">⚡</span>模型连通性测试</h2>
+    <div class="sub">选择模型发起一次真实调用，返回响应耗时与本次 <span class="kbd">usage</span>（输入/输出/总 Token）并换算成本。</div>
+    <div class="row" style="margin-bottom:16px" id="modelBtns"></div>
+    <div class="row">
+      <button class="btn-primary" id="btnTest" onclick="testSelected()">测试所选模型</button>
+      <span class="hint" id="testStatus"></span>
+    </div>
+    <div class="divider"></div>
+    <div id="testResult"><div class="hint">尚未测试。</div></div>
+  </div>
+
+  <!-- 用量计量 -->
+  <div class="card">
+    <h2><span class="ico">📊</span>本机用量计量器</h2>
+    <div class="sub">累计本工具发起的所有测试调用（仅统计你在本页点击产生的真实用量，存于浏览器本地）。</div>
+    <div class="grid" style="margin-bottom:16px">
+      <div class="stat"><div class="label">累计调用次数</div><div class="val" id="statCalls">0</div></div>
+      <div class="stat"><div class="label">累计输入 Token</div><div class="val" id="statIn">0</div></div>
+      <div class="stat"><div class="label">累计输出 Token</div><div class="val" id="statOut">0</div></div>
+      <div class="stat"><div class="label">累计总 Token</div><div class="val" id="statTotal">0</div></div>
+      <div class="stat"><div class="label">累计成本（CNY，估）</div><div class="val" id="statCost">¥0.0000</div></div>
+    </div>
+    <div class="row">
+      <button class="btn-ghost" onclick="resetMeter()">清空计量器</button>
+      <button class="btn-ghost" onclick="exportLog()">导出调用记录</button>
+    </div>
+    <div class="divider"></div>
+    <div class="hint" style="margin-bottom:8px">调用记录（最近 50 条）</div>
+    <div id="historyWrap"><div class="hint">暂无记录。</div></div>
+  </div>
+
+  <!-- 定价参考 -->
+  <div class="card">
+    <h2><span class="ico">💵</span>官方定价参考</h2>
+    <div class="sub">核验自 DeepSeek 官方文档（2026-09-27）。单位：美元 / 每百万 Token；Off-peak 为 Peak 半价。</div>
+    <table>
+      <thead><tr><th>模型</th><th>输入·缓存命中</th><th>输入·缓存未命中</th><th>输出</th><th>上下文</th></tr></thead>
+      <tbody id="priceBody"></tbody>
+    </table>
+    <div class="banner info" style="margin-top:14px;margin-bottom:0">
+      <b>峰谷时段：</b>Peak = 周一至周五 01:00–04:00 与 06:00–10:00（UTC，不含中国法定节假日）；其余全部为 Off-peak（半价）。费用 = Token 数 × 单价，优先扣除赠送余额。<br>
+      <b>模型变更：</b>旧名 <span class="kbd">deepseek-chat</span> / <span class="kbd">deepseek-v4-flash-vision-exp</span> 已退役，请求由 DeepSeek-V4.1-Flash 服务并按 Flash 价计费。
+    </div>
+  </div>
+
+  <!-- 明细引导 -->
+  <div class="card">
+    <h2><span class="ico">🧾</span>用量明细怎么看</h2>
+    <div class="banner warn">
+      <b>重要：</b>DeepSeek 官方 API <b>不提供公开的 Token 用量明细接口</b>——API Key 只能查到 <span class="kbd">/user/balance</span> 余额（本次已实测）。逐笔/按日/按模型的消费明细，需登录开放平台后台查看。
+    </div>
+    <div class="hint" style="line-height:2">
+      1. 登录 <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> → 左侧菜单「用量 / Usage」；<br>
+      2. 可查看账户总余额、赠送/充值余额，支持按 <b>API Key / 模型 / 时间区间</b> 筛选每次请求的 Token 消耗明细；<br>
+      3. 用量数据存在约 <b>5 分钟延迟</b>，非实时；<br>
+      4. 想在本工具持续统计，请将同一 Key 用于日常调用，本页「本机计量器」会累加记录。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="ico">📋</span>运行日志</h2>
+    <div class="log" id="logBox"><div class="ts">— 等待操作 —</div></div>
+  </div>
+
+  <footer>DeepSeek 用量测试工具 · 定价核验于 2026-09-27 · 数据仅在浏览器本地处理</footer>
+</div>
+
+<script>
+/* ================= 定价数据（美元/百万token，官方 2026-09-27 核验） ================= */
+const PRICING = {
+  'deepseek-flash': {inputHit:{peak:0.022, offpeak:0.003}, inputMiss:{peak:0.30, offpeak:0.15}, output:{peak:1.20, offpeak:0.60}},
+  'deepseek-v4-pro': {inputHit:{peak:0.044, offpeak:0.022}, inputMiss:{peak:1.32, offpeak:0.66}, output:{peak:3.96, offpeak:1.98}}
+};
+// legacy 模型名 -> 实际计费模型
+const MODEL_ALIAS = {
+  'deepseek-chat':'deepseek-flash',
+  'deepseek-v4-flash':'deepseek-flash',
+  'deepseek-v4-flash-vision-exp':'deepseek-flash',
+  'deepseek-v4-pro':'deepseek-v4-pro',
+  'deepseek-reasoner':'deepseek-v4-pro'
+};
+const MODELS = [
+  {name:'deepseek-chat', desc:'项目现用文本模型', vision:false},
+  {name:'deepseek-flash', desc:'DeepSeek-V4.1-Flash · 官方当前主力', vision:true},
+  {name:'deepseek-v4-pro', desc:'DeepSeek-V4-Pro-0813 · 推理旗舰', vision:false},
+  {name:'deepseek-v4-flash-vision-exp', desc:'视觉模型（已退役→V4.1-Flash 服务）', vision:true}
+];
+let selectedModel = 'deepseek-chat';
+let USDCNY = 7.20;
+
+/* ================= 峰谷判断（UTC） ================= */
+function isPeakNow(){
+  const d = new Date();
+  const dow = d.getUTCDay(); // 0=Sun..6=Sat
+  if(dow===0 || dow===6) return false; // 周末 off-peak
+  const h = d.getUTCHours(), m = d.getUTCMinutes();
+  const t = h + m/60;
+  return (t>=1 && t<4) || (t>=6 && t<10); // 不含中国法定节假日（无法自动判断）
+}
+function peakLabel(){ return isPeakNow() ? 'Peak 峰时' : 'Off-peak 谷时'; }
+
+/* ================= 工具函数 ================= */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function log(msg, cls){
+  const box = $('logBox');
+  const t = new Date().toLocaleTimeString('zh-CN',{hour12:false});
+  const line = document.createElement('div');
+  line.innerHTML = `<span class="ts">[${t}]</span> <span class="${cls||''}">${esc(msg)}</span>`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+  while(box.children.length > 200) box.removeChild(box.firstChild);
+}
+function costOf(model, input, output, cacheHit){
+  const billing = MODEL_ALIAS[model] || 'deepseek-flash';
+  const p = PRICING[billing];
+  const mode = isPeakNow() ? 'peak' : 'offpeak';
+  const inPrice = cacheHit ? p.inputHit[mode] : p.inputMiss[mode];
+  const outPrice = p.output[mode];
+  return {usd: (input/1e6)*inPrice + (output/1e6)*outPrice, billing, mode};
+}
+
+/* ================= 余额 ================= */
+async function queryBalance(){
+  const key = $('apiKey').value.trim();
+  if(!key){ alert('请先填入 API Key'); return; }
+  const btn = $('btnBalance'); btn.disabled = true; btn.textContent = '查询中…';
+  log('查询余额 GET /user/balance', 'info');
+  try{
+    const res = await fetch('https://api.deepseek.com/user/balance',{
+      headers:{'Authorization':'Bearer '+key,'Accept':'application/json'}
+    });
+    const data = await res.json().catch(()=>({}));
+    if(data.error){
+      log('余额查询失败：'+data.error.message, 'err');
+      renderBalanceError(data.error);
+    } else if(data.is_available !== undefined){
+      log('余额查询成功', 'ok');
+      renderBalance(data);
+    } else {
+      log('余额响应异常', 'err');
+      renderBalanceError({message:'响应格式异常'});
+    }
+  }catch(e){
+    log('余额请求异常：'+String(e), 'err');
+    renderBalanceError({message:String(e)});
+  }finally{
+    btn.disabled = false; btn.textContent = '查询余额';
+  }
+}
+function renderBalanceError(err){
+  $('balanceArea').innerHTML = `<div class="banner err"><b>查询失败：</b>${esc(err.message||'未知错误')}${err.type?('（'+esc(err.type)+'）'):''}<br><span class="hint">若提示 key invalid，说明该 Key 已失效/被删除，请到 platform.deepseek.com 重新生成。</span></div>`;
+}
+function renderBalance(data){
+  const infos = (data.balance_infos||[]).map(i=>{
+    const total = parseFloat(i.total_balance||0);
+    const granted = parseFloat(i.granted_balance||0);
+    const topped = parseFloat(i.topped_up_balance||0);
+    return `<div class="stat"><div class="label">总余额（${esc(i.currency||'CNY')}）</div><div class="val ${total>0?'ok':'warn'}">${total.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">赠送余额</div><div class="val small">${granted.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">充值余额</div><div class="val small">${topped.toFixed(2)}</div></div>`;
+  }).join('');
+  const avail = data.is_available ? '<span class="tag offpeak">可用</span>' : '<span class="tag peak">余额不足</span>';
+  $('balanceArea').innerHTML =
+    `<div style="margin-bottom:12px">状态：${avail} <span class="hint">（is_available = ${data.is_available}）</span></div>
+     <div class="grid">${infos || '<div class="hint">无余额信息</div>'}</div>`;
+}
+
+/* ================= 模型连通性 ================= */
+function renderModelBtns(){
+  $('modelBtns').innerHTML = MODELS.map(m=>
+    `<button class="model-btn ${m.name===selectedModel?'active':''}" onclick="selectModel('${m.name}')">
+       <span class="mname">${esc(m.name)} ${MODEL_ALIAS[m.name]&&MODEL_ALIAS[m.name]!==m.name?'<span class="tag legacy">legacy</span>':''}</span>
+       <span class="mdesc">${esc(m.desc)}</span>
+     </button>`).join('');
+}
+function selectModel(name){ selectedModel = name; renderModelBtns(); }
+
+async function testSelected(){
+  const key = $('apiKey').value.trim();
+  if(!key){ alert('请先填入 API Key'); return; }
+  const model = selectedModel;
+  const vision = MODELS.find(m=>m.name===model).vision;
+  const btn = $('btnTest'); btn.disabled = true;
+  $('testStatus').textContent = '测试中…';
+  const t0 = performance.now();
+  try{
+    let res, data, payload;
+    if(vision){
+      payload = { model, messages:[{role:'user', content:[
+        {type:'text', text:'请用一句话描述这张图的内容。'},
+        {type:'image_url', image_url:{url: TEST_IMG}}
+      ]}], max_tokens:200 };
+    } else {
+      payload = { model, messages:[{role:'user', content:'用一句话回复：你好'}], max_tokens:100 };
+    }
+    log(`测试模型 ${model}（${vision?'视觉':'文本'}）`, 'info');
+    res = await fetch('https://api.deepseek.com/chat/completions',{
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body: JSON.stringify(payload)
+    });
+    data = await res.json().catch(()=>({}));
+    const ms = Math.round(performance.now()-t0);
+    if(data.error){
+      log(`测试失败：${data.error.message}`, 'err');
+      $('testResult').innerHTML = `<div class="banner err"><b>${esc(model)} 调用失败：</b>${esc(data.error.message)}（${ms}ms）</div>`;
+      return;
+    }
+    const u = data.usage || {};
+    const inT = u.prompt_tokens||0, outT = u.completion_tokens||0, total = u.total_tokens||(inT+outT);
+    const cacheHit = !!(u.prompt_tokens_details && u.prompt_tokens_details.cached_tokens>0);
+    const c = costOf(model, inT, outT, cacheHit);
+    const cny = c.usd * USDCNY;
+    const reply = (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'').slice(0,80);
+    log(`✓ ${model} 成功：${total} tokens / ${ms}ms`, 'ok');
+    $('testResult').innerHTML = `
+      <div class="banner ok"><b>${esc(model)} 连通正常</b> · 耗时 ${ms}ms · 计费模型 ${esc(c.billing)} · ${c.mode==='peak'?'<span class="tag peak">Peak</span>':'<span class="tag offpeak">Off-peak</span>'}</div>
+      <div class="grid" style="margin-bottom:14px">
+        <div class="stat"><div class="label">输入 Token</div><div class="val">${inT}</div></div>
+        <div class="stat"><div class="label">输出 Token</div><div class="val">${outT}</div></div>
+        <div class="stat"><div class="label">总 Token</div><div class="val">${total}</div></div>
+        <div class="stat"><div class="label">本次成本（估）</div><div class="val small">$${c.usd.toFixed(6)} / ¥${cny.toFixed(6)}</div></div>
+      </div>
+      <div class="hint">模型回复预览：${esc(reply)}</div>`;
+    recordUsage(model, inT, outT, cny, ms, true);
+  }catch(e){
+    const ms = Math.round(performance.now()-t0);
+    log(`测试异常：${String(e)}`, 'err');
+    $('testResult').innerHTML = `<div class="banner err"><b>请求异常：</b>${esc(String(e))}（${ms}ms）<br><span class="hint">多为网络/跨域问题，浏览器直连 DeepSeek API 一般可成功。</span></div>`;
+  }finally{
+    btn.disabled = false;
+    $('testStatus').textContent = '';
+  }
+}
+
+async function runAllTests(){
+  await queryBalance();
+  if($('balanceArea').innerText.indexOf('查询失败')>=0) return;
+  await testSelected();
+}
+
+/* ================= 本机计量器 ================= */
+const LS_KEY = 'ds_usage_meter_v1';
+function loadMeter(){ try{ return JSON.parse(localStorage.getItem(LS_KEY))||{calls:0,in:0,out:0,cost:0,history:[]}; }catch(e){ return {calls:0,in:0,out:0,cost:0,history:[]}; } }
+function saveMeter(m){ localStorage.setItem(LS_KEY, JSON.stringify(m)); }
+function recordUsage(model, inT, outT, cny, ms, ok){
+  const m = loadMeter();
+  m.calls++; m.in+=inT; m.out+=outT; m.cost+=cny;
+  m.history.unshift({t:Date.now(), model, in:inT, out:outT, cost:cny, ms, ok});
+  if(m.history.length>50) m.history = m.history.slice(0,50);
+  saveMeter(m); renderMeter();
+}
+function renderMeter(){
+  const m = loadMeter();
+  $('statCalls').textContent = m.calls;
+  $('statIn').textContent = m.in;
+  $('statOut').textContent = m.out;
+  $('statTotal').textContent = m.in + m.out;
+  $('statCost').textContent = '¥' + m.cost.toFixed(4);
+  if(m.history.length===0){ $('historyWrap').innerHTML = '<div class="hint">暂无记录。</div>'; return; }
+  $('historyWrap').innerHTML = `<table><thead><tr><th>时间</th><th>模型</th><th>输入</th><th>输出</th><th>耗时</th><th>成本(¥)</th><th>状态</th></tr></thead><tbody>`+
+    m.history.map(h=>`<tr>
+      <td>${new Date(h.t).toLocaleString('zh-CN',{hour12:false})}</td>
+      <td class="mono">${esc(h.model)}</td>
+      <td>${h.in}</td><td>${h.out}</td><td>${h.ms}ms</td>
+      <td>${h.cost.toFixed(5)}</td>
+      <td>${h.ok?'<span class="tag offpeak">成功</span>':'<span class="tag peak">失败</span>'}</td>
+    </tr>`).join('')+`</tbody></table>`;
+}
+function resetMeter(){ if(confirm('确认清空本机计量器？')){ localStorage.removeItem(LS_KEY); renderMeter(); log('已清空计量器'); } }
+function exportLog(){
+  const m = loadMeter();
+  const csv = ['时间,模型,输入Token,输出Token,耗时ms,成本CNY,状态'].concat(
+    m.history.map(h=>[new Date(h.t).toISOString(),h.model,h.in,h.out,h.ms,h.cost.toFixed(6),h.ok?'成功':'失败'].join(','))
+  ).join('\n');
+  const blob = new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='deepseek-usage-log.csv'; a.click();
+  log('已导出调用记录 CSV');
+}
+
+/* ================= Key 管理 ================= */
+function toggleKey(){ const i=$('apiKey'); const show = i.type==='password'; i.type = show?'text':'password'; $('btnToggle').textContent = show?'隐藏':'显示'; }
+function saveKey(){ const k=$('apiKey').value.trim(); if(!k){alert('请先输入 Key');return;} localStorage.setItem('ds_api_key',k); log('Key 已保存到本机'); }
+function clearKey(){ localStorage.removeItem('ds_api_key'); $('apiKey').value=''; log('Key 已清除'); }
+function loadKey(){ const k = localStorage.getItem('ds_api_key'); if(k) $('apiKey').value = k; }
+
+/* ================= 定价表渲染 ================= */
+function renderPrice(){
+  const rows = Object.entries(PRICING).map(([name,p])=>{
+    const peak = (a,b)=>`$${a} / $${b}`;
+    return `<tr>
+      <td class="mono">${name}<br><span class="tag legacy">${name==='deepseek-flash'?'V4.1-Flash':'V4-Pro-0813'}</span></td>
+      <td>${peak(p.inputHit.peak,p.inputHit.offpeak)}<br><span class="hint">峰/谷</span></td>
+      <td>${peak(p.inputMiss.peak,p.inputMiss.offpeak)}<br><span class="hint">峰/谷</span></td>
+      <td>${peak(p.output.peak,p.output.offpeak)}<br><span class="hint">峰/谷</span></td>
+      <td>1M</td>
+    </tr>`;
+  }).join('');
+  $('priceBody').innerHTML = rows;
+}
+
+/* ================= 时钟 & 峰谷 ================= */
+function tick(){
+  const d = new Date();
+  $('utcTime').textContent = d.toISOString().slice(11,16);
+  const peak = isPeakNow();
+  const chip = $('chipPeak');
+  chip.className = 'chip ' + (peak?'peak':'offpeak');
+  $('chipPeakText').textContent = peak ? 'Peak 峰时' : 'Off-peak 谷时';
+}
+
+/* ================= 内置测试图（1x1 极小红点） ================= */
+const TEST_IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+/* ================= 初始化 ================= */
+renderModelBtns();
+renderPrice();
+renderMeter();
+loadKey();
+tick(); setInterval(tick, 1000);
+log('工具已就绪。当前 ' + peakLabel() + '。');
+</script>
+</body>
+</html>
