@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="zh-CN" data-page-node-id="y8BglTxzXdJKzOQ8TVDssn">
+<head data-page-node-id="GnSbxJRerh9gFoQkLDaMQn">
+<meta charset="UTF-8" data-page-node-id="VUXlYqqFkUgRFvvijCoHAi">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="158zJbQFkkBErgqUOmCM2L">
 <title>DeepSeek 用量测试工具</title>
 <style>
   :root{
@@ -103,114 +103,114 @@
   @media(max-width:640px){.stat .val{font-size:20px}.card{padding:18px}}
 </style>
 </head>
-<body>
-<div class="wrap">
+<body data-page-node-id="fsnBhqmIUpcHmICrLXdzyT">
+<div class="wrap" data-page-node-id="FwlCSVRc7sGeT2dPijf6Yy">
 
-  <header>
-    <div class="brand">
-      <div class="logo">DS</div>
-      <div>
-        <h1>DeepSeek 用量测试工具</h1>
-        <p>余额查询 · 模型连通性 · Token 计量 · 成本换算</p>
+  <header data-page-node-id="WHOJTzOlJqRcvYog1luyrO">
+    <div class="brand" data-page-node-id="Yf41znc0XxVR3kGtYCM8A8">
+      <div class="logo" data-page-node-id="P101qfZpei6spnH7GmyWov">DS</div>
+      <div data-page-node-id="gWUwGeSDTKPnUBhPbGjwzG">
+        <h1 data-page-node-id="ZWRS1CXKgq3x1fw5tzQ2Rb">DeepSeek 用量测试工具</h1>
+        <p data-page-node-id="8C3LxT9sOyUIy3n8I6bsfj">余额查询 · 模型连通性 · Token 计量 · 成本换算</p>
       </div>
     </div>
-    <div class="statusbar">
-      <span class="chip" id="chipPeak"><span class="dot"></span><span id="chipPeakText">计算中…</span></span>
-      <span class="chip" id="chipUtc">UTC <span id="utcTime">--:--</span></span>
-      <span class="chip" id="chipUsd">USD/CNY <span id="usdRate" contenteditable="false">7.20</span></span>
+    <div class="statusbar" data-page-node-id="FX32Qe23TZ28x36tp3F73A">
+      <span class="chip" id="chipPeak" data-page-node-id="zCHDLawD61K006n1H2Hbee"><span class="dot" data-page-node-id="FhJSspRLVCrdXDiSc5jpwn"></span><span id="chipPeakText" data-page-node-id="BYrwB2lXMJgFppItvOs7wo">计算中…</span></span>
+      <span class="chip" id="chipUtc" data-page-node-id="FPGFgMVD69BSHZy34BPA3R">UTC <span id="utcTime" data-page-node-id="Hj7REtwCQVlnmQ1FG2rjGP">--:--</span></span>
+      <span class="chip" id="chipUsd" data-page-node-id="FZn0fq34nClS8ZJzYTlRp1">USD/CNY <span id="usdRate" contenteditable="false" data-page-node-id="hGAlOZuT60DJJBKHj9JIJT">7.20</span></span>
     </div>
   </header>
 
   <!-- API Key -->
-  <div class="card">
-    <h2><span class="ico">🔑</span>API Key 配置</h2>
-    <div class="sub">粘贴 DeepSeek 开放平台的 API Key（sk-开头）。仅保存在你的浏览器本地，不会上传到任何服务器。</div>
-    <div class="row">
-      <input type="password" id="apiKey" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
-      <button class="btn-ghost" id="btnToggle" onclick="toggleKey()">显示</button>
-      <button class="btn-primary" onclick="saveKey()">保存</button>
-      <button class="btn-danger" onclick="clearKey()">清除</button>
+  <div class="card" data-page-node-id="W1sQdxg8Dge8SsnBfw2lCQ">
+    <h2 data-page-node-id="tIls9NuyDHtDrC3BnY9HFF"><span class="ico" data-page-node-id="PAhVGyjpifzqz7qz6ZDJJm">🔑</span>API Key 配置</h2>
+    <div class="sub" data-page-node-id="e8xt559bZ0Dd9jau3y4TMD">粘贴 DeepSeek 开放平台的 API Key（sk-开头）。仅保存在你的浏览器本地，不会上传到任何服务器。</div>
+    <div class="row" data-page-node-id="noHMgaHs3NaIgrwSQQGtwL">
+      <input type="password" id="apiKey" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off" data-page-node-id="W4n9ywoBqtl8YP1ebLUGAV">
+      <button class="btn-ghost" id="btnToggle" onclick="toggleKey()" data-page-node-id="gZdxuiH0A4PZT4EK1Vh7ce">显示</button>
+      <button class="btn-primary" onclick="saveKey()" data-page-node-id="CXdQadJoGWYOkOQeow4uan">保存</button>
+      <button class="btn-danger" onclick="clearKey()" data-page-node-id="GIdXfiCz4Oh6vTEcoaarq2">清除</button>
     </div>
   </div>
 
   <!-- 余额 -->
-  <div class="card">
-    <h2><span class="ico">💰</span>账户余额</h2>
-    <div class="sub">调用官方 <span class="kbd">GET /user/balance</span> 接口实时查询（CNY）。</div>
-    <div class="row" style="margin-bottom:16px">
-      <button class="btn-primary" id="btnBalance" onclick="queryBalance()">查询余额</button>
-      <button class="btn-ghost" onclick="runAllTests()">一键全测（余额 + 连通性）</button>
+  <div class="card" data-page-node-id="LBKRLIqwyfDAe3OeGiJetM">
+    <h2 data-page-node-id="Ggo4AYLD0to2MFZ6rEfMax"><span class="ico" data-page-node-id="AiHhV3tZ0VOCLX7mRa0XOs">💰</span>账户余额</h2>
+    <div class="sub" data-page-node-id="4McKKbTiKxbKY8iAcjdxwr">调用官方 <span class="kbd" data-page-node-id="QAkYdCoGQricXbFjkfYNKE">GET /user/balance</span> 接口实时查询（CNY）。</div>
+    <div class="row" style="margin-bottom:16px" data-page-node-id="CoSYfR2FyuwUd59ouRUwiZ">
+      <button class="btn-primary" id="btnBalance" onclick="queryBalance()" data-page-node-id="UxMJs6lWpGXMGnpzJv4ndy">查询余额</button>
+      <button class="btn-ghost" onclick="runAllTests()" data-page-node-id="b4cjnS3dURlQlV5ImHnQ5E">一键全测（余额 + 连通性）</button>
     </div>
-    <div id="balanceArea"><div class="hint">尚未查询。填入 Key 后点击「查询余额」。</div></div>
+    <div id="balanceArea" data-page-node-id="ZsHVeyxJqXHZgqwJFdwuhB"><div class="hint" data-page-node-id="tHkHaClaHkjG7cwnh6RswZ">尚未查询。填入 Key 后点击「查询余额」。</div></div>
   </div>
 
   <!-- 连通性测试 -->
-  <div class="card">
-    <h2><span class="ico">⚡</span>模型连通性测试</h2>
-    <div class="sub">选择模型发起一次真实调用，返回响应耗时与本次 <span class="kbd">usage</span>（输入/输出/总 Token）并换算成本。</div>
-    <div class="row" style="margin-bottom:16px" id="modelBtns"></div>
-    <div class="row">
-      <button class="btn-primary" id="btnTest" onclick="testSelected()">测试所选模型</button>
-      <span class="hint" id="testStatus"></span>
+  <div class="card" data-page-node-id="iOqbJUdoETzglu2hltERBF">
+    <h2 data-page-node-id="tETpiaC1NjafEGuXNuX4py"><span class="ico" data-page-node-id="SFd1d9u63opj7liVQj3eGj">⚡</span>模型连通性测试</h2>
+    <div class="sub" data-page-node-id="0CvCz8z835REFZ9MnrHcoJ">选择模型发起一次真实调用，返回响应耗时与本次 <span class="kbd" data-page-node-id="DgCwNFqn1Th7jOwSiho4xS">usage</span>（输入/输出/总 Token）并换算成本。</div>
+    <div class="row" style="margin-bottom:16px" id="modelBtns" data-page-node-id="1K8MNURdxY83QizRqaxGCP"></div>
+    <div class="row" data-page-node-id="4nFu4qmhG9okUYTjv6uFdN">
+      <button class="btn-primary" id="btnTest" onclick="testSelected()" data-page-node-id="B52AciDpizkFpIgii53jFi">测试所选模型</button>
+      <span class="hint" id="testStatus" data-page-node-id="8bDq2W1LSMGfRWUvztWnEu"></span>
     </div>
-    <div class="divider"></div>
-    <div id="testResult"><div class="hint">尚未测试。</div></div>
+    <div class="divider" data-page-node-id="Vg26UhNDSjoh3KynFnSXvo"></div>
+    <div id="testResult" data-page-node-id="QAVXzJBBVZDOj3KoHpaXzf"><div class="hint" data-page-node-id="G92VqSsdAl3n1fNHQSiAH8">尚未测试。</div></div>
   </div>
 
   <!-- 用量计量 -->
-  <div class="card">
-    <h2><span class="ico">📊</span>本机用量计量器</h2>
-    <div class="sub">累计本工具发起的所有测试调用（仅统计你在本页点击产生的真实用量，存于浏览器本地）。</div>
-    <div class="grid" style="margin-bottom:16px">
-      <div class="stat"><div class="label">累计调用次数</div><div class="val" id="statCalls">0</div></div>
-      <div class="stat"><div class="label">累计输入 Token</div><div class="val" id="statIn">0</div></div>
-      <div class="stat"><div class="label">累计输出 Token</div><div class="val" id="statOut">0</div></div>
-      <div class="stat"><div class="label">累计总 Token</div><div class="val" id="statTotal">0</div></div>
-      <div class="stat"><div class="label">累计成本（CNY，估）</div><div class="val" id="statCost">¥0.0000</div></div>
+  <div class="card" data-page-node-id="JewdBFzAPSBBhF5cyXLZWK">
+    <h2 data-page-node-id="vZKsnizmmISwhROXPdyFEk"><span class="ico" data-page-node-id="F3tQ9p8bgidG6XNGzLQgDX">📊</span>本机用量计量器</h2>
+    <div class="sub" data-page-node-id="ZI8oOcHLSmeKtqqbHSHUTq">累计本工具发起的所有测试调用（仅统计你在本页点击产生的真实用量，存于浏览器本地）。</div>
+    <div class="grid" style="margin-bottom:16px" data-page-node-id="McPkCDq7vmbavsVvN4Wdy1">
+      <div class="stat" data-page-node-id="X9P22ZenApJvP9AAx6qhzW"><div class="label" data-page-node-id="m3ZJsQb1AwfoSgSRnCZqSy">累计调用次数</div><div class="val" id="statCalls" data-page-node-id="9vYcr0gygGKgULToHZoVrv">0</div></div>
+      <div class="stat" data-page-node-id="MIZGIpBYSP35qT6fXIvqB2"><div class="label" data-page-node-id="ke2tRB4HNnA4g1XxUpVtVc">累计输入 Token</div><div class="val" id="statIn" data-page-node-id="7HgBev1taHLnoCfdcF4HFF">0</div></div>
+      <div class="stat" data-page-node-id="nl4O5CK1ViNTcwYxvA1xZU"><div class="label" data-page-node-id="UyOW8NTHp4SCCRg4sScMTO">累计输出 Token</div><div class="val" id="statOut" data-page-node-id="EPY74lc0mDSzGoFZyUDvmx">0</div></div>
+      <div class="stat" data-page-node-id="oMXZzzW92R8BEixQ5yAkEU"><div class="label" data-page-node-id="kValM5MTppzpiKCaECWmv2">累计总 Token</div><div class="val" id="statTotal" data-page-node-id="GT1IPWkfLxNU23nN08XAAk">0</div></div>
+      <div class="stat" data-page-node-id="FJbPdBQ2Wh4ZQghUhgPypn"><div class="label" data-page-node-id="Yxgcg1FxbEcU3CwsZYGnNW">累计成本（CNY，估）</div><div class="val" id="statCost" data-page-node-id="tcgV3mlOu1JpPIk961EdTa">¥0.0000</div></div>
     </div>
-    <div class="row">
-      <button class="btn-ghost" onclick="resetMeter()">清空计量器</button>
-      <button class="btn-ghost" onclick="exportLog()">导出调用记录</button>
+    <div class="row" data-page-node-id="UDb78qxE4SyHHul8dXVStY">
+      <button class="btn-ghost" onclick="resetMeter()" data-page-node-id="po6GdozoJFJ7rDefbOph2z">清空计量器</button>
+      <button class="btn-ghost" onclick="exportLog()" data-page-node-id="5kUOg6LCFK0ADEk9WdTWgD">导出调用记录</button>
     </div>
-    <div class="divider"></div>
-    <div class="hint" style="margin-bottom:8px">调用记录（最近 50 条）</div>
-    <div id="historyWrap"><div class="hint">暂无记录。</div></div>
+    <div class="divider" data-page-node-id="VSzADn1GHG7sL21XdeqJ6w"></div>
+    <div class="hint" style="margin-bottom:8px" data-page-node-id="EjnvYrVzlPBcR3WWwT2xle">调用记录（最近 50 条）</div>
+    <div id="historyWrap" data-page-node-id="4t3SAsgsIBZDt8vXYhai1n"><div class="hint" data-page-node-id="KQPlE9BbWwxsSUQm5lNbpS">暂无记录。</div></div>
   </div>
 
   <!-- 定价参考 -->
-  <div class="card">
-    <h2><span class="ico">💵</span>官方定价参考</h2>
-    <div class="sub">核验自 DeepSeek 官方文档（2026-09-27）。单位：美元 / 每百万 Token；Off-peak 为 Peak 半价。</div>
-    <table>
-      <thead><tr><th>模型</th><th>输入·缓存命中</th><th>输入·缓存未命中</th><th>输出</th><th>上下文</th></tr></thead>
-      <tbody id="priceBody"></tbody>
+  <div class="card" data-page-node-id="XgvC9OGH9GPZJqp2yB7K3l">
+    <h2 data-page-node-id="b4lh4TSxyuSibcXzGEt3QN"><span class="ico" data-page-node-id="P3pAMgBFbYsX1FDEVUdTh7">💵</span>官方定价参考</h2>
+    <div class="sub" data-page-node-id="VdHbfOPMwD8iifLphdEZyc">核验自 DeepSeek 官方文档（2026-09-27）。单位：美元 / 每百万 Token；Off-peak 为 Peak 半价。</div>
+    <table data-page-node-id="FJjpQp3cACdnXMJxBFQZvQ">
+      <thead data-page-node-id="Sq63szIuECQTwBM1n1GhTG"><tr data-page-node-id="DyDJhC7d1Enfkezs4fwUju"><th data-page-node-id="m48trH0pXAuEPTEVhuXGPg">模型</th><th data-page-node-id="SXjokPoNc6avh6xpoW50eI">输入·缓存命中</th><th data-page-node-id="haA9ziSyGML6cnR0Uvidb3">输入·缓存未命中</th><th data-page-node-id="aXCHYEi4oFj8Lj3iG07AbI">输出</th><th data-page-node-id="XgrNd5bXHYvFr1JxMCkyH3">上下文</th></tr></thead>
+      <tbody id="priceBody" data-page-node-id="cfHZEFcifqMTibqMQq5hpw"></tbody>
     </table>
-    <div class="banner info" style="margin-top:14px;margin-bottom:0">
-      <b>峰谷时段：</b>Peak = 周一至周五 01:00–04:00 与 06:00–10:00（UTC，不含中国法定节假日）；其余全部为 Off-peak（半价）。费用 = Token 数 × 单价，优先扣除赠送余额。<br>
-      <b>模型变更：</b>旧名 <span class="kbd">deepseek-chat</span> / <span class="kbd">deepseek-v4-flash-vision-exp</span> 已退役，请求由 DeepSeek-V4.1-Flash 服务并按 Flash 价计费。
+    <div class="banner info" style="margin-top:14px;margin-bottom:0" data-page-node-id="ZsNhcGVAxCAxaD4W3QchiK">
+      <b data-page-node-id="cHANxouXH3nb1Amki7qbwZ">峰谷时段：</b>Peak = 周一至周五 01:00–04:00 与 06:00–10:00（UTC，不含中国法定节假日）；其余全部为 Off-peak（半价）。费用 = Token 数 × 单价，优先扣除赠送余额。<br data-page-node-id="YWC54e2Yvj9iCA7WNfzf0F">
+      <b data-page-node-id="SF6ZHnC2DMx1UIsEImlRUP">模型变更：</b>旧名 <span class="kbd" data-page-node-id="1K8K1vtfiEW02uspojghJR">deepseek-chat</span> / <span class="kbd" data-page-node-id="h4n7H6HnsnCanqoNhSgDh0">deepseek-v4-flash-vision-exp</span> 已退役，请求由 DeepSeek-V4.1-Flash 服务并按 Flash 价计费。
     </div>
   </div>
 
   <!-- 明细引导 -->
-  <div class="card">
-    <h2><span class="ico">🧾</span>用量明细怎么看</h2>
-    <div class="banner warn">
-      <b>重要：</b>DeepSeek 官方 API <b>不提供公开的 Token 用量明细接口</b>——API Key 只能查到 <span class="kbd">/user/balance</span> 余额（本次已实测）。逐笔/按日/按模型的消费明细，需登录开放平台后台查看。
+  <div class="card" data-page-node-id="8FbUUNguNfKyuRHyyEqtCk">
+    <h2 data-page-node-id="vm1PuI8lHEQVPoB2M0PqFr"><span class="ico" data-page-node-id="7kuEsGn3jLA3wlJwoOSqoL">🧾</span>用量明细怎么看</h2>
+    <div class="banner warn" data-page-node-id="cDYmJygnQoG85ydMR9xzv9">
+      <b data-page-node-id="UmfuKym3ODTyYDm5E9LWsx">重要：</b>DeepSeek 官方 API <b data-page-node-id="ZMhACyo0mEOJnJExDwPS6r">不提供公开的 Token 用量明细接口</b>——API Key 只能查到 <span class="kbd" data-page-node-id="jmTkA68yEjEp6E7WemNJlm">/user/balance</span> 余额（本次已实测）。逐笔/按日/按模型的消费明细，需登录开放平台后台查看。
     </div>
-    <div class="hint" style="line-height:2">
-      1. 登录 <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> → 左侧菜单「用量 / Usage」；<br>
-      2. 可查看账户总余额、赠送/充值余额，支持按 <b>API Key / 模型 / 时间区间</b> 筛选每次请求的 Token 消耗明细；<br>
-      3. 用量数据存在约 <b>5 分钟延迟</b>，非实时；<br>
+    <div class="hint" style="line-height:2" data-page-node-id="Wia5UNaH5o2jKVugUbRsgf">
+      1. 登录 <a href="https://platform.deepseek.com" target="_blank" data-page-node-id="xZ0KC63o2Itv6aYt5H48rZ">platform.deepseek.com</a> → 左侧菜单「用量 / Usage」；<br data-page-node-id="EMRBfksk2xGvQD3YSABPEM">
+      2. 可查看账户总余额、赠送/充值余额，支持按 <b data-page-node-id="CC246kCGnOd0TXbdlu6wqu">API Key / 模型 / 时间区间</b> 筛选每次请求的 Token 消耗明细；<br data-page-node-id="c1Ki1JXtpAgVNNmTY6EJOv">
+      3. 用量数据存在约 <b data-page-node-id="GeEfN6itMZ95qTHf3FTNXC">5 分钟延迟</b>，非实时；<br data-page-node-id="BiFKm92z1n1tFwnLZWEOyg">
       4. 想在本工具持续统计，请将同一 Key 用于日常调用，本页「本机计量器」会累加记录。
     </div>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">📋</span>运行日志</h2>
-    <div class="log" id="logBox"><div class="ts">— 等待操作 —</div></div>
+  <div class="card" data-page-node-id="gQnD8cG9vNUY7CGIiUOVA3">
+    <h2 data-page-node-id="HCI3u7EtAc12uLBAnTcWht"><span class="ico" data-page-node-id="kFG76nf6YYtBirNpZaLoqs">📋</span>运行日志</h2>
+    <div class="log" id="logBox" data-page-node-id="rchnPKZ3DiFrcHlCGrlzhN"><div class="ts" data-page-node-id="KoZpmetFHy3pws1cYa0cWp">— 等待操作 —</div></div>
   </div>
 
-  <footer>DeepSeek 用量测试工具 · 定价核验于 2026-09-27 · 数据仅在浏览器本地处理</footer>
+  <footer data-page-node-id="rsBkYdT7aXlrAdLZbDJVJ5">DeepSeek 用量测试工具 · 定价核验于 2026-09-27 · 数据仅在浏览器本地处理</footer>
 </div>
 
 <script>
@@ -458,7 +458,7 @@ function tick(){
 }
 
 /* ================= 内置测试图（1x1 极小红点） ================= */
-const TEST_IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const TEST_IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEUlEQVR4nGPwzf6HFTEMLQkAnP5tgVk9wQkAAAAASUVORK5CYII=';
 
 /* ================= 初始化 ================= */
 renderModelBtns();
