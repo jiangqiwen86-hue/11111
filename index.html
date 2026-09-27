@@ -1915,7 +1915,7 @@ function catCtx(cat){
 
 // ===== Key 安全存储：优先走服务端代理（Key 不落前端），直连 Key 仅作可选兜底 =====
 // 内置默认 DeepSeek Key（所有账号默认可用；总负责人可在配置页覆盖）
-const DEFAULT_DS_KEY = 'sk-41c5f526a7224b8dab5e14adfcfeca6f';
+const DEFAULT_DS_KEY = 'sk-d7ebf5710d9f4755989bd431b8610e41';
 function proxyUrl(){ return (localStorage.getItem('liveops_proxy_url')||'').trim(); }
 function proxyToken(){ return localStorage.getItem('liveops_proxy_token')||''; }
 function directKey(){ return localStorage.getItem('liveops_ds_key') || DEFAULT_DS_KEY; }
@@ -1973,7 +1973,7 @@ async function callDeepSeekVision(prompt, imageBase64){
         {type:'image_url', image_url:{url:imageBase64, detail:detail}}
       ]}
     ];
-    const bodyStr=JSON.stringify({model:'deepseek-v4-flash-vision-exp',messages,temperature:0.7,max_tokens:6000});
+    const bodyStr=JSON.stringify({model:'deepseek-v4-flash-vision-exp',thinking:{type:'disabled'},messages,temperature:0.7,max_tokens:6000});
     if(bodyStr.length > 8*1024*1024) return {err:'请求体超过 8MB（图片或提示词过大）。请换张更小的图片，或先压缩到 1MB 以内再上传。'};
     for(let attempt=1; attempt<=3; attempt++){
       try{
