@@ -1915,7 +1915,7 @@ function catCtx(cat){
 
 // ===== Key 安全存储：优先走服务端代理（Key 不落前端），直连 Key 仅作可选兜底 =====
 // 内置默认 DeepSeek Key（所有账号默认可用；总负责人可在配置页覆盖）
-const DEFAULT_DS_KEY = 'sk-d7ebf5710d9f4755989bd431b8610e41';
+const DEFAULT_DS_KEY = 'sk-484c9651e1b04675bcfecd9212dac2ec';
 function proxyUrl(){ return (localStorage.getItem('liveops_proxy_url')||'').trim(); }
 function proxyToken(){ return localStorage.getItem('liveops_proxy_token')||''; }
 function directKey(){ return localStorage.getItem('liveops_ds_key') || DEFAULT_DS_KEY; }
